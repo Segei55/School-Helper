@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "281319480824",
+    "project_id": "schoolapp-23aa5",
+    "storage_bucket": "schoolapp-23aa5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:281319480824:android:6861f8ab188867c6e6ca0d",
+        "android_client_info": {
+          "package_name": "com.example.school_v3"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "281319480824-4ntvlml89vd1q3h91aluiluqm76vcnka.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.school_v3",
+            "certificate_hash": "7ce44a00818eaa79eec1c501fa54d0a5ea128eaa"
+          }
+        },
+        {
+          "client_id": "281319480824-ebvoutmehb31teeu641q8gnmr2l8hnp1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD61tCfkKxKhCFpB0kTTp7Gwybc_aLdLrs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "281319480824-ebvoutmehb31teeu641q8gnmr2l8hnp1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
