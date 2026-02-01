@@ -78,12 +78,20 @@ fun GradesScreen(navController: NavController, loginViewModel: LoginViewModel) {
     val gradeList by gradesViewModel.grades.collectAsState()
     val isLoading by gradesViewModel.isLoading.collectAsState()
     val isPremium by gradesViewModel.isPremium.collectAsState()
+    val errorMessage by gradesViewModel.errorMessage.collectAsState()
 
     var isDropdownExpanded by remember { mutableStateOf(false) }
     var selectedSubject by remember { mutableStateOf(OVERALL_AVERAGE) }
     var showClearDialog by remember { mutableStateOf(false) }
     var showPremiumBanner by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            gradesViewModel.clearError()
+        }
+    }
 
     val filteredGrades by remember(selectedSubject, gradeList) {
         derivedStateOf {

@@ -368,23 +368,35 @@ fun NoteDetailScreen(navController: NavController, note: Note, onSave: (Note) ->
     val isImeVisible = WindowInsets.isImeVisible
 
     fun scrollToCursor(blockId: String) {
-        val layoutResult = textLayoutResults[blockId]
-        val tfv = tfvMap[blockId]
-        val requester = bringIntoViewRequesters[blockId]
-        if (layoutResult != null && tfv != null && requester != null) {
-            scope.launch {
-                val cursorRect = layoutResult.getCursorRect(tfv.selection.start)
-                // Добавляем отступ сверху и снизу (примерно 400 пикселей), чтобы курсор был в центре внимания
-                val margin = 400f 
-                requester.bringIntoView(
-                    cursorRect.copy(
-                        top = (cursorRect.top - margin).coerceAtLeast(0f),
-                        bottom = cursorRect.bottom + margin
-                    )
-                )
-            }
-        } else {
-            scope.launch {
+        scope.launch {
+            // Небольшая задержка, чтобы дать время на обновление LayoutResult после изменения текста
+            delay(50)
+            val layoutResult = textLayoutResults[blockId]
+            val tfv = tfvMap[blockId]
+            val requester = bringIntoViewRequesters[blockId]
+            
+            if (layoutResult != null && tfv != null && requester != null) {
+                val cursorIndex = tfv.selection.start
+                // Проверяем, что индекс курсора находится в пределах текущего текста в layoutResult
+                // Это предотвращает IndexOutOfBoundsException, если разметка еще не обновилась
+                if (cursorIndex <= layoutResult.layoutInput.text.length) {
+                    try {
+                        val cursorRect = layoutResult.getCursorRect(cursorIndex)
+                        val margin = 400f
+                        requester.bringIntoView(
+                            cursorRect.copy(
+                                top = (cursorRect.top - margin).coerceAtLeast(0f),
+                                bottom = cursorRect.bottom + margin
+                            )
+                        )
+                    } catch (e: Exception) {
+                        // Если расчет координат не удался, просто прокручиваем к самому блоку
+                        requester.bringIntoView()
+                    }
+                } else {
+                    requester.bringIntoView()
+                }
+            } else {
                 bringIntoViewRequesters[blockId]?.bringIntoView()
             }
         }
@@ -636,10 +648,8 @@ fun NoteDetailScreen(navController: NavController, note: Note, onSave: (Note) ->
                                 .onFocusChanged { 
                                     if (it.isFocused) {
                                         activeBlockId = block.id
-                                        scope.launch {
-                                            delay(350)
-                                            scrollToCursor(block.id)
-                                        }
+                                        // scrollToCursor уже запускает корутину и имеет задержку
+                                        scrollToCursor(block.id)
                                     }
                                 },
                             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),

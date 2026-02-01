@@ -25,6 +25,9 @@ class NotesViewModel(application: Application, private val loginViewModel: Login
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     private val googleDriveRestManager = GoogleDriveRestManager(application)
     private val authManager = AuthManager.getInstance(application)
     private val noteRepository = NoteRepository(application)
@@ -46,6 +49,10 @@ class NotesViewModel(application: Application, private val loginViewModel: Login
 
     init {
         _notes.value = noteRepository.loadNotes()
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     fun addNote(note: Note) {
@@ -71,6 +78,7 @@ class NotesViewModel(application: Application, private val loginViewModel: Login
         viewModelScope.launch {
             if (!isUserLoggedIn()) {
                 Log.w(LOG_TAG, "Not logged in to Google Drive. Cannot export notes.")
+                _errorMessage.value = "Не удалось выполнить экспорт. Попробуйте войти в аккаунт заново."
                 return@launch
             }
             _isLoading.value = true
@@ -82,9 +90,11 @@ class NotesViewModel(application: Application, private val loginViewModel: Login
                     Log.d(LOG_TAG, "Notes exported successfully with ID: $result")
                 } else {
                     Log.e(LOG_TAG, "Failed to export notes: result is null")
+                    _errorMessage.value = "Не удалось выполнить экспорт. Попробуйте войти в аккаунт заново."
                 }
             } catch (e: Exception) {
                 Log.e(LOG_TAG, "Error exporting notes: ", e)
+                _errorMessage.value = "Не удалось выполнить экспорт. Попробуйте войти в аккаунт заново."
             } finally {
                 _isLoading.value = false
             }
@@ -95,6 +105,7 @@ class NotesViewModel(application: Application, private val loginViewModel: Login
         viewModelScope.launch {
             if (!isUserLoggedIn()) {
                 Log.w(LOG_TAG, "Not logged in to Google Drive. Cannot import notes.")
+                _errorMessage.value = "Не удалось выполнить импорт. Попробуйте войти в аккаунт заново."
                 return@launch
             }
             _isLoading.value = true
@@ -102,8 +113,14 @@ class NotesViewModel(application: Application, private val loginViewModel: Login
                 Log.d(LOG_TAG, "Attempting to read notes from Google Drive.")
                 val notesJson = googleDriveRestManager.downloadFile("notes.json")
                 
-                if (notesJson == null || notesJson.isBlank()) {
-                    Log.d(LOG_TAG, "No notes JSON found on Google Drive or it's blank.")
+                if (notesJson == null) {
+                    Log.d(LOG_TAG, "No notes JSON found on Google Drive.")
+                    _errorMessage.value = "Не удалось выполнить импорт. Попробуйте войти в аккаунт заново."
+                    return@launch
+                }
+                
+                if (notesJson.isBlank()) {
+                    Log.d(LOG_TAG, "Notes JSON is blank.")
                     return@launch
                 }
                 
@@ -138,9 +155,11 @@ class NotesViewModel(application: Application, private val loginViewModel: Login
 
                 } catch (e: Exception) {
                     Log.e(LOG_TAG, "JSON parsing failed for notes from Google Drive!", e)
+                    _errorMessage.value = "Не удалось выполнить импорт. Попробуйте войти в аккаунт заново."
                 }
             } catch (e: Exception) {
                 Log.e(LOG_TAG, "Error during Google Drive read operation in importNotes: ", e)
+                _errorMessage.value = "Не удалось выполнить импорт. Попробуйте войти в аккаунт заново."
             } finally {
                 _isLoading.value = false
             }

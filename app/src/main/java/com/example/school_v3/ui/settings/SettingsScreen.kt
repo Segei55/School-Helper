@@ -171,7 +171,7 @@ fun SettingsScreen(navController: NavController, loginViewModel: LoginViewModel,
             item {
                 SettingsSection(icon = Icons.Default.Info, title = "О приложении") {
                     SettingsItem(text = "Версия") {
-                        Text("Бета 0.1.0", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+                        Text("Бета 0.1.1", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                     }
                     SettingsItem(text = "Разработчик") {
                         Text("Sihmer", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)

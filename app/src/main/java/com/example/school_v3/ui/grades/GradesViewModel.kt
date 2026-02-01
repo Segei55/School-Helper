@@ -24,6 +24,9 @@ class GradesViewModel(application: Application, private val loginViewModel: Logi
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     private val googleDriveRestManager = GoogleDriveRestManager(application)
     private val authManager = AuthManager.getInstance(application)
     
@@ -33,6 +36,10 @@ class GradesViewModel(application: Application, private val loginViewModel: Logi
         viewModelScope.launch {
             _grades.value = dataStore.gradesFlow.first()
         }
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     private fun saveLocally() {
@@ -65,15 +72,21 @@ class GradesViewModel(application: Application, private val loginViewModel: Logi
             val token = authManager.getAccessToken()
             if (token == null) {
                 Log.w("GradesViewModel", "No access token, cannot export")
+                _errorMessage.value = "Не удалось выполнить экспорт. Попробуйте войти в аккаунт заново."
                 return@launch
             }
             _isLoading.value = true
             try {
                 val gradesJson = Json.encodeToString(_grades.value)
                 val result = googleDriveRestManager.uploadFile("grades.json", gradesJson)
-                if (result != null) Log.d("GradesViewModel", "Exported successfully")
+                if (result != null) {
+                    Log.d("GradesViewModel", "Exported successfully")
+                } else {
+                    _errorMessage.value = "Не удалось выполнить экспорт. Попробуйте войти в аккаунт заново."
+                }
             } catch (e: Exception) {
                 Log.e("GradesViewModel", "Export error", e)
+                _errorMessage.value = "Не удалось выполнить экспорт. Попробуйте войти в аккаунт заново."
             } finally {
                 _isLoading.value = false
             }
@@ -85,6 +98,7 @@ class GradesViewModel(application: Application, private val loginViewModel: Logi
             val token = authManager.getAccessToken()
             if (token == null) {
                 Log.w("GradesViewModel", "No access token, cannot import")
+                _errorMessage.value = "Не удалось выполнить импорт. Попробуйте войти в аккаунт заново."
                 return@launch
             }
             _isLoading.value = true
@@ -98,10 +112,14 @@ class GradesViewModel(application: Application, private val loginViewModel: Logi
                         Log.d("GradesViewModel", "Imported successfully")
                     } catch (e: Exception) {
                         Log.e("GradesViewModel", "Parse error", e)
+                        _errorMessage.value = "Не удалось выполнить импорт. Попробуйте войти в аккаунт заново."
                     }
+                } else {
+                    _errorMessage.value = "Не удалось выполнить импорт. Попробуйте войти в аккаунт заново."
                 }
             } catch (e: Exception) {
                 Log.e("GradesViewModel", "Import error", e)
+                _errorMessage.value = "Не удалось выполнить импорт. Попробуйте войти в аккаунт заново."
             } finally {
                 _isLoading.value = false
             }

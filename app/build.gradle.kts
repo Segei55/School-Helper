@@ -29,7 +29,7 @@ android {
         minSdk = 26
         targetSdk = 35 // Рекомендуемый таргет для Play Store в 2024
         versionCode = 1
-        versionName = "Бета 0.1.0"
+        versionName = "Бета 0.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
