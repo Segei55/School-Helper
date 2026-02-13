@@ -5,9 +5,11 @@ on:
   push:
     branches:
       - main
+      - PC
   pull_request:
     branches:
       - main
+      - PC
   workflow_dispatch:
 
 jobs:
