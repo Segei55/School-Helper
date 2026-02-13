@@ -1,0 +1,493 @@
+
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, safeStorage, net } = require('electron');
+const path = require('path');
+const https = require('https');
+const querystring = require('querystring');
+const fs = require('fs');
+const url = require('url');
+
+// --- LOCAL DEV CONFIG ---
+// Пытаемся загрузить ключи из .env.local только для локальной разработки
+// В продакшене (в exe/deb) этот файл не будет использоваться, так как ключ будет вшит.
+try {
+    const envLocalPath = path.join(__dirname, '../.env.local');
+    if (fs.existsSync(envLocalPath)) {
+        const envConfig = require('dotenv').parse(fs.readFileSync(envLocalPath));
+        for (const k in envConfig) {
+            process.env[k] = envConfig[k];
+        }
+    }
+} catch (e) {
+    // Игнорируем ошибки dotenv в продакшене
+}
+
+// --- КОНФИГУРАЦИЯ GOOGLE CLOUD (Desktop) ---
+// Note: Drive operations still require an access token, but the login flow now relies on the website.
+
+// SECURITY: Keys are injected via build process.
+const API_KEY_FALLBACK = ""; 
+
+// SECURITY: KEY FOR AI
+// Логика выбора ключа:
+// 1. Сначала ищем в process.env (если запущено локально с .env.local)
+// 2. Если нет, ищем заглушку "REPLACE_ME_IN_CI" (которую заменит GitHub Actions при сборке)
+let OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+// Если мы в продакшене и ключ не был подменен (все еще заглушка), значит что-то пошло не так при сборке.
+// Но если CI/CD отработал, то "REPLACE_ME_IN_CI" будет заменена на реальный ключ строкой.
+if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'REPLACE_ME_IN_CI') {
+     // Fallback на переменную, если она была вшита через sed
+     OPENROUTER_API_KEY = "REPLACE_ME_IN_CI"; 
+}
+
+let mainWindow;
+let tray = null;
+let isQuitting = false;
+
+// Хранение токенов в памяти
+let sessionTokens = {
+  access_token: null,
+  refresh_token: null,
+  expiry_date: null
+};
+
+// Хранение настроек приложения
+let appSettings = {
+  autoLaunch: false,
+  minimizeToTray: true
+};
+
+// Пути к файлам конфигурации
+const TOKEN_PATH = path.join(app.getPath('userData'), 'auth_tokens.enc'); 
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'app_settings.json');
+
+// Register Custom Protocol
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('schoolhelper', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('schoolhelper');
+}
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId("Школьный Помощник");
+}
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+    }
+    const urlStr = commandLine.find(arg => arg.startsWith('schoolhelper://'));
+    if (urlStr) handleDeepLink(urlStr);
+  });
+
+  app.on('open-url', (event, urlStr) => {
+      event.preventDefault();
+      handleDeepLink(urlStr);
+  });
+}
+
+function safeBase64Decode(str) {
+    try {
+        let cleanStr = decodeURIComponent(str);
+        cleanStr = cleanStr.replace(/ /g, '+');
+        cleanStr = cleanStr.replace(/-/g, '+').replace(/_/g, '/');
+        while (cleanStr.length % 4) {
+            cleanStr += '=';
+        }
+        return Buffer.from(cleanStr, 'base64').toString('utf-8');
+    } catch (e) {
+        console.error("Base64 Decode Error:", e);
+        return null;
+    }
+}
+
+function handleDeepLink(urlStr) {
+    try {
+        const parsedUrl = new URL(urlStr);
+        if (parsedUrl.host === 'auth_callback') {
+             const base64Data = parsedUrl.searchParams.get('data');
+             if (base64Data) {
+                 const jsonString = safeBase64Decode(base64Data);
+                 if (jsonString) {
+                     try {
+                         const data = JSON.parse(jsonString);
+                         const isPremium = 
+                            data.is_premium === true || 
+                            data.is_premium === '1' || 
+                            data.is_premium === 1 || 
+                            data.is_premium === 'true';
+
+                         const userData = {
+                             email: data.email,
+                             displayName: data.name || (data.email ? data.email.split('@')[0] : 'User'),
+                             photoUrl: data.picture,
+                             licenseKey: data.license_key,
+                             isPremium: isPremium,
+                             validUntil: data.premium_until,
+                             accessToken: data.access_token
+                         };
+
+                         if (userData.email && mainWindow) {
+                             mainWindow.webContents.send('auth-data', userData);
+                             if (mainWindow.isMinimized()) mainWindow.restore();
+                             if (!mainWindow.isVisible()) mainWindow.show();
+                             mainWindow.focus();
+                         }
+                     } catch (parseError) {}
+                 }
+             }
+        }
+        else if (parsedUrl.host === 'auth') {
+            const params = parsedUrl.searchParams;
+            const email = params.get('email');
+            const licenseKey = params.get('key');
+            const rawPremium = params.get('is_premium') || params.get('premium');
+            const isPremium = rawPremium === '1' || rawPremium === 'true';
+            const validUntil = params.get('until');
+            const photoUrl = params.get('photo_url') || params.get('photo') || params.get('picture');
+            const displayName = params.get('name') || params.get('display_name') || (email ? email.split('@')[0] : 'User');
+            const accessToken = params.get('access_token') || params.get('token');
+
+            if (email) {
+                const userData = {
+                    email, licenseKey, isPremium, validUntil,
+                    photoUrl: photoUrl || null,
+                    displayName: displayName, 
+                    accessToken: accessToken || null 
+                };
+                if (mainWindow) {
+                    mainWindow.webContents.send('auth-data', userData);
+                    if (mainWindow.isMinimized()) mainWindow.restore();
+                    if (!mainWindow.isVisible()) mainWindow.show();
+                    mainWindow.focus();
+                }
+            }
+        }
+    } catch (e) {}
+}
+
+function loadSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_PATH)) {
+      const data = fs.readFileSync(SETTINGS_PATH);
+      appSettings = { ...appSettings, ...JSON.parse(data) };
+    }
+  } catch (e) {}
+  applySettings();
+}
+
+function saveSettings(newSettings) {
+  try {
+    appSettings = { ...appSettings, ...newSettings };
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(appSettings));
+    applySettings();
+  } catch (e) {}
+}
+
+function applySettings() {
+  app.setLoginItemSettings({
+    openAtLogin: appSettings.autoLaunch,
+    path: app.getPath('exe')
+  });
+}
+
+function loadTokens() {
+  try {
+    if (fs.existsSync(TOKEN_PATH)) {
+      const buffer = fs.readFileSync(TOKEN_PATH);
+      if (safeStorage.isEncryptionAvailable()) {
+          try {
+             const decrypted = safeStorage.decryptString(buffer);
+             sessionTokens = JSON.parse(decrypted);
+             return;
+          } catch (e) {
+             try {
+                sessionTokens = JSON.parse(buffer.toString());
+                saveTokens({});
+                return;
+             } catch (jsonErr) {}
+          }
+      }
+    }
+    const LEGACY_PATH = path.join(app.getPath('userData'), 'auth_tokens.json');
+    if (fs.existsSync(LEGACY_PATH)) {
+        const data = fs.readFileSync(LEGACY_PATH);
+        sessionTokens = JSON.parse(data);
+        saveTokens({});
+        fs.unlinkSync(LEGACY_PATH);
+    }
+  } catch (e) {}
+}
+
+function saveTokens(tokens) {
+  try {
+    sessionTokens = { ...sessionTokens, ...tokens };
+    const jsonStr = JSON.stringify(sessionTokens);
+    if (safeStorage.isEncryptionAvailable()) {
+        const encryptedBuffer = safeStorage.encryptString(jsonStr);
+        fs.writeFileSync(TOKEN_PATH, encryptedBuffer);
+    } else {
+        const LEGACY_PATH = path.join(app.getPath('userData'), 'auth_tokens.json');
+        fs.writeFileSync(LEGACY_PATH, jsonStr);
+    }
+  } catch (e) {}
+}
+
+function createTray() {
+  const iconPath = path.join(__dirname, 'icon.png');
+  tray = new Tray(iconPath);
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Открыть', click: () => mainWindow.show() },
+    { type: 'separator' },
+    { label: 'Выход', click: () => { isQuitting = true; app.quit(); } }
+  ]);
+  tray.setToolTip('Школьный Помощник');
+  tray.setContextMenu(contextMenu);
+  tray.on('click', () => {
+    if (mainWindow) {
+        if (mainWindow.isVisible()) {
+            if (mainWindow.isFocused()) mainWindow.hide(); else mainWindow.focus();
+        } else {
+            mainWindow.show();
+            mainWindow.focus();
+        }
+    }
+  });
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1280, height: 720, minWidth: 900, minHeight: 600,
+    frame: false, backgroundColor: '#202225',
+    icon: path.join(__dirname, 'icon.png'), show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false, contextIsolation: true, sandbox: false 
+    },
+  });
+
+  const startUrl = process.env.ELECTRON_START_URL || url.format({
+    pathname: path.join(__dirname, '../dist/index.html'),
+    protocol: 'file:', slashes: true
+  });
+
+  mainWindow.loadURL(startUrl);
+
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media', 'notifications'];
+    if (allowedPermissions.includes(permission)) callback(true); else callback(false);
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const safeDomains = ['https://school-helper.ru', 'https://accounts.google.com', 'https://www.google.com'];
+    if (safeDomains.some(domain => url.startsWith(domain))) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl);
+    if (parsedUrl.protocol !== 'file:' && parsedUrl.protocol !== 'schoolhelper:') {
+        event.preventDefault();
+        const safeDomains = ['school-helper.ru', 'accounts.google.com'];
+        if (safeDomains.some(domain => navigationUrl.includes(domain))) shell.openExternal(navigationUrl);
+    }
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show(); mainWindow.focus();
+    if (process.platform !== 'darwin' && process.argv.length >= 2) {
+       const urlStr = process.argv.find(arg => arg.startsWith('schoolhelper://'));
+       if (urlStr) handleDeepLink(urlStr);
+    }
+  });
+
+  app.on('browser-window-focus', () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.focus(); });
+
+  mainWindow.on('close', (event) => {
+    if (!isQuitting && appSettings.minimizeToTray) {
+      event.preventDefault(); mainWindow.hide();
+    }
+    return false;
+  });
+
+  ipcMain.on('minimize-window', () => mainWindow.minimize());
+  ipcMain.on('maximize-window', () => { if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize(); });
+  ipcMain.on('close-window', () => { mainWindow.close(); });
+}
+
+ipcMain.handle('get-app-settings', () => appSettings);
+ipcMain.handle('update-app-setting', (event, key, value) => {
+  const newSettings = {}; newSettings[key] = value;
+  saveSettings(newSettings); return appSettings;
+});
+ipcMain.handle('get-api-key', () => process.env.API_KEY || API_KEY_FALLBACK);
+ipcMain.on('set-auth-token', (event, token) => {
+  if (token === null) {
+    sessionTokens = { access_token: null, refresh_token: null, expiry_date: null };
+    try { if (fs.existsSync(TOKEN_PATH)) fs.unlinkSync(TOKEN_PATH); } catch(e) {}
+  } else {
+    sessionTokens.access_token = token;
+    saveTokens({ access_token: token }); 
+  }
+});
+ipcMain.handle('google-login', async (event) => {
+    const authUrl = "https://school-helper.ru/#/auth?mode=app";
+    if (authUrl.startsWith('https://')) await shell.openExternal(authUrl);
+    return null;
+});
+
+// --- AI PROXY (SECURE REQUESTS) ---
+ipcMain.on('ai-request', async (event, { messages, model, systemInstruction }) => {
+    // В локальном режиме (dev) ключ берется из .env.local
+    // В продакшене (build) ключ "REPLACE_ME_IN_CI" будет заменен на реальный
+    if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY.includes('REPLACE_ME')) {
+        event.sender.send('ai-error', 'API ключ не настроен. Если вы запускаете локально, создайте .env.local. Если это сборка, проверьте CI.');
+        return;
+    }
+
+    const payload = JSON.stringify({
+        model: model,
+        messages: [
+            { role: 'system', content: systemInstruction },
+            ...messages
+        ],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 2000
+    });
+
+    const request = net.request({
+        method: 'POST',
+        protocol: 'https:',
+        hostname: 'openrouter.ai',
+        path: '/api/v1/chat/completions',
+    });
+
+    request.setHeader('Authorization', `Bearer ${OPENROUTER_API_KEY}`);
+    request.setHeader('Content-Type', 'application/json');
+    request.setHeader('HTTP-Referer', 'https://school-helper.ru');
+    request.setHeader('X-Title', 'School Helper Desktop');
+
+    request.on('response', (response) => {
+        if (response.statusCode !== 200) {
+            event.sender.send('ai-error', `Ошибка сервера: ${response.statusCode}`);
+            return;
+        }
+
+        response.on('data', (chunk) => {
+            const lines = chunk.toString('utf8').split('\n');
+            for (const line of lines) {
+                if (line.trim().startsWith('data: ')) {
+                    const data = line.trim().slice(6);
+                    if (data === '[DONE]') {
+                        event.sender.send('ai-done');
+                        return;
+                    }
+                    try {
+                        const json = JSON.parse(data);
+                        const content = json.choices[0]?.delta?.content;
+                        if (content) {
+                            event.sender.send('ai-chunk', content);
+                        }
+                    } catch (e) {}
+                }
+            }
+        });
+
+        response.on('end', () => {
+             event.sender.send('ai-done');
+        });
+        
+        response.on('error', (e) => {
+            event.sender.send('ai-error', e.message);
+        });
+    });
+
+    request.on('error', (error) => {
+        event.sender.send('ai-error', error.message);
+    });
+
+    request.write(payload);
+    request.end();
+});
+
+
+// --- DRIVE OPERATIONS ---
+function request(options, postData = null) {
+  return new Promise((resolve, reject) => {
+    const req = https.request({ ...options, timeout: 15000 }, (res) => {
+      let body = ''; res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) { try { resolve(JSON.parse(body)); } catch(e) { resolve(body); } } 
+        else if (res.statusCode === 401) { const error = new Error('UNAUTHORIZED'); error.code = '401'; reject(error); }
+        else { const error = new Error(`Status: ${res.statusCode}`); error.body = body; error.code = 'API_ERROR'; reject(error); }
+      });
+    });
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+    req.on('error', (e) => { reject(e); });
+    if (postData) req.write(postData); req.end();
+  });
+}
+
+async function authorizedRequest(options, postData = null) {
+    if (!sessionTokens.access_token) throw new Error("Google Drive Token missing");
+    if (!options.headers) options.headers = {};
+    options.headers['Authorization'] = `Bearer ${sessionTokens.access_token}`;
+    return await request(options, postData);
+}
+
+async function findFile(filename) {
+    const query = encodeURIComponent(`name = '${filename}' and trashed = false`);
+    const result = await authorizedRequest({
+        hostname: 'www.googleapis.com', path: `/drive/v3/files?q=${query}&spaces=drive&fields=files(id,name)`, method: 'GET'
+    });
+    return (result.files && result.files.length > 0) ? result.files[0] : null;
+}
+
+ipcMain.handle('drive-export', async (event, filename, content) => {
+    if (!sessionTokens.access_token) return false;
+    try {
+        const existingFile = await findFile(filename);
+        if (existingFile) {
+            await authorizedRequest({
+                hostname: 'www.googleapis.com', path: `/upload/drive/v3/files/${existingFile.id}?uploadType=media`,
+                method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(content) }
+            }, content);
+        } else {
+            const metadata = { name: filename, mimeType: 'application/json' };
+            const boundary = '-------schoolhelperdesktop';
+            const delimiter = "\r\n--" + boundary + "\r\n";
+            const close_delim = "\r\n--" + boundary + "--";
+            const multipartBody = delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) + delimiter + 'Content-Type: application/json\r\n\r\n' + content + close_delim;
+            await authorizedRequest({
+                hostname: 'www.googleapis.com', path: '/upload/drive/v3/files?uploadType=multipart',
+                method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + boundary, 'Content-Length': Buffer.byteLength(multipartBody) }
+            }, multipartBody);
+        }
+        return true;
+    } catch (e) { return false; }
+});
+
+ipcMain.handle('drive-import', async (event, filename) => {
+    if (!sessionTokens.access_token) return null;
+    try {
+        const existingFile = await findFile(filename);
+        if (!existingFile) return null;
+        const content = await authorizedRequest({
+            hostname: 'www.googleapis.com', path: `/drive/v3/files/${existingFile.id}?alt=media`, method: 'GET'
+        });
+        return typeof content === 'object' ? JSON.stringify(content) : content;
+    } catch (e) { return null; }
+});
+
+app.whenReady().then(() => { loadTokens(); loadSettings(); createTray(); createWindow(); });
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

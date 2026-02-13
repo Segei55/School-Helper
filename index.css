@@ -1,0 +1,11 @@
+/* Базовые стили для предотвращения ошибок сборки Vite */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
