@@ -27,36 +27,32 @@ jobs:
       - name: Install Linux Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2
+          sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
 
       - name: Install Project Dependencies
         run: npm install
 
-      - name: Inject Secrets into Main Process (Linux)
-        run: |
-          sed -i "s|REPLACE_ME_IN_CI|${{ secrets.OPENROUTER_API_KEY }}|g" electron/main.js
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-
       - name: Build Web Application
         run: npm run build
         env:
-          API_KEY: ${{ secrets.API_KEY }}
+          VITE_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VITE_API_KEY: ${{ secrets.API_KEY }}
 
       - name: Build Electron App (AppImage, deb, tar.gz)
         run: npm run build:linux
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USE_SYSTEM_FPM: "true"
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: school-helper-linux
           path: |
-            dist_electron/*.AppImage
-            dist_electron/*.deb
-            dist_electron/*.tar.gz
+            dist_electron/School-Helper.AppImage
+            dist_electron/School-Helper.deb
+            dist_electron/School-Helper.tar.gz
 
   build-win:
     runs-on: windows-latest
@@ -72,29 +68,22 @@ jobs:
       - name: Install Project Dependencies
         run: npm install
 
-      - name: Inject Secrets into Main Process (Windows)
-        shell: pwsh
-        run: |
-          $path = "electron/main.js"
-          $content = Get-Content $path -Raw
-          $newContent = $content -replace "REPLACE_ME_IN_CI", "${{ secrets.OPENROUTER_API_KEY }}"
-          Set-Content $path $newContent -NoNewline
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-
       - name: Build Web Application
         run: npm run build
         env:
-          API_KEY: ${{ secrets.API_KEY }}
+          VITE_OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VITE_API_KEY: ${{ secrets.API_KEY }}
 
       - name: Build Electron App (exe - nsis and portable)
         run: npx electron-builder --win nsis portable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: school-helper-windows
           path: |
-            dist_electron/*.exe
+            dist_electron/School-Helper-Installer-Setup.exe
+            dist_electron/School-Helper-Portable.exe

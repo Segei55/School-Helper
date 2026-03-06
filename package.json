@@ -56,7 +56,7 @@
   },
   "build": {
     "appId": "com.schoolhelper.app",
-    "productName": "School Helper",
+    "productName": "School-Helper",
     "directories": {
       "output": "dist_electron",
       "buildResources": "electron"
@@ -69,8 +69,14 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        {
+          "target": "nsis",
+          "artifactName": "School-Helper-Installer-Setup.${ext}"
+        },
+        {
+          "target": "portable",
+          "artifactName": "School-Helper-Portable.${ext}"
+        }
       ],
       "icon": "electron/icon.png",
       "publish": null
@@ -88,9 +94,18 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb",
-        "tar.gz"
+        {
+          "target": "AppImage",
+          "artifactName": "School-Helper.${ext}"
+        },
+        {
+          "target": "deb",
+          "artifactName": "School-Helper.${ext}"
+        },
+        {
+          "target": "tar.gz",
+          "artifactName": "School-Helper.${ext}"
+        }
       ],
       "category": "Education",
       "icon": "electron/icon.png",
@@ -100,6 +115,9 @@
         "schemes": [
           "school-helper"
         ]
+      },
+      "extraEnvironmentVariables": {
+        "OPENROUTER_API_KEY": "REPLACE_ME_IN_CI"
       }
     }
   }
