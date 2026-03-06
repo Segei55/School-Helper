@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { 
   Plus, Trash2, Bold, Italic, Underline, 
   MoreVertical, Download, Upload,
-  CheckCircle, AlertCircle, FileText, Lock, Loader2, X, Info
+  CheckCircle, AlertCircle, FileText, Lock, Loader2, X, Info, ChevronLeft
 } from 'lucide-react';
 import { Note, TextBlock, StyleRange } from '../types';
 
@@ -14,7 +14,8 @@ interface NotesPageProps {
   onCreateNote: () => void;     
   isCreatingGlobal: boolean;   
   isPremium?: boolean;
-  onTriggerPremium?: (source: string) => void; 
+  onTriggerPremium?: (source: string) => void;
+  onSyncError?: () => void;
 }
 
 const STORAGE_KEY = 'school_helper_notes_v3';
@@ -157,7 +158,7 @@ const RichTextBlock = memo(({
 
     const cleanText = finalNormalizedText;
     if (cleanText.length === 0 && block.text.length > 0) {
-       document.execCommand('removeFormat', false, null);
+       document.execCommand('removeFormat', false, undefined);
     }
     onUpdate(block.id, cleanText, finalStyles);
     onCheckStyles();
@@ -259,7 +260,7 @@ const NoteEditor = memo(({ note, onUpdate, isDarkMode }: any) => {
   );
 });
 
-const NotesPage: React.FC<NotesPageProps> = ({ isDarkMode = true, isLoggedIn, refreshTrigger, onCreateNote, isCreatingGlobal, isPremium, onTriggerPremium }) => {
+const NotesPage: React.FC<NotesPageProps> = ({ isDarkMode = true, isLoggedIn, refreshTrigger, onCreateNote, isCreatingGlobal, isPremium, onTriggerPremium, onSyncError }) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -270,7 +271,25 @@ const NotesPage: React.FC<NotesPageProps> = ({ isDarkMode = true, isLoggedIn, re
   // --- Resizing Logic ---
   const [sidebarWidth, setSidebarWidth] = useState(288); // Default and Max Width
   const [isResizing, setIsResizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(true);
   const sidebarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setSidebarWidth(window.innerWidth);
+      } else {
+        setSidebarWidth(288);
+        setShowMobileSidebar(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const startResizing = useCallback((e: React.MouseEvent) => {
     setIsResizing(true);
@@ -381,6 +400,9 @@ const NotesPage: React.FC<NotesPageProps> = ({ isDarkMode = true, isLoggedIn, re
   const handleSelectNote = (id: number) => {
     setSelectedNoteId(id);
     setConfirmDeleteId(null);
+    if (isMobile) {
+      setShowMobileSidebar(false);
+    }
   };
 
   const handleNoteUpdate = useCallback((updatedNote: Note) => {
@@ -411,7 +433,13 @@ const NotesPage: React.FC<NotesPageProps> = ({ isDarkMode = true, isLoggedIn, re
       } else {
         setSyncStatus('error');
       }
-    } catch (e) { setSyncStatus('error'); }
+    } catch (e: any) { 
+        console.error(e);
+        if (e.message && (e.message.includes("UNAUTHORIZED") || e.message.includes("NO_TOKEN")) && onSyncError) {
+             onSyncError();
+        }
+        setSyncStatus('error'); 
+    }
     finally { setTimeout(() => setSyncStatus('idle'), 2000); }
   };
 
@@ -427,7 +455,13 @@ const NotesPage: React.FC<NotesPageProps> = ({ isDarkMode = true, isLoggedIn, re
       const content = JSON.stringify(notes);
       const ok = await window.electron.driveExport(DRIVE_FILENAME, content);
       setSyncStatus(ok ? 'success' : 'error');
-    } catch (e) { setSyncStatus('error'); }
+    } catch (e: any) { 
+        console.error(e);
+        if (e.message && (e.message.includes("UNAUTHORIZED") || e.message.includes("NO_TOKEN")) && onSyncError) {
+             onSyncError();
+        }
+        setSyncStatus('error'); 
+    }
     finally { setTimeout(() => setSyncStatus('idle'), 2000); }
   };
 
@@ -436,110 +470,129 @@ const NotesPage: React.FC<NotesPageProps> = ({ isDarkMode = true, isLoggedIn, re
   return (
     <div className="flex h-full overflow-hidden animate-in fade-in duration-500 relative select-none">
       {/* Resizable Sidebar */}
-      <div 
-        ref={sidebarRef}
-        style={{ width: sidebarWidth }}
-        className="flex flex-col gap-4 shrink-0 h-full relative"
-      >
-        <div className="flex items-center justify-between px-2">
-            <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Заметки</h2>
-            <div className="relative">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
-                className={`p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-200 text-gray-600'}`}
-              >
-                 {syncStatus === 'loading' ? <Loader2 size={20} className="animate-spin text-[#eb459e]" /> : <MoreVertical size={20} />}
-                 {syncStatus === 'success' && <div className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full" />}
-                 {syncStatus === 'error' && <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />}
-              </button>
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0 z-[100]" onClick={() => setShowMenu(false)} />
-                  <div className={`absolute top-full right-0 mt-2 w-56 rounded-xl shadow-2xl border z-[101] overflow-hidden ${isDarkMode ? 'bg-[#2f3136] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-800'}`}>
-                    <button 
-                      onClick={handleImport} 
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-left transition-colors ${!isLoggedIn ? 'opacity-50 text-gray-500' : 'hover:bg-gray-500/10'} ${!isPremium ? 'opacity-70' : ''}`}
-                    >
-                      {!isPremium ? <Lock size={16} /> : (isLoggedIn ? <Download size={16} className="text-[#3ba55c]" /> : <Lock size={16} />)} 
-                      Импорт с Drive
-                    </button>
-                    <button 
-                      onClick={handleExport} 
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-left transition-colors ${!isLoggedIn ? 'opacity-50 text-gray-500' : 'hover:bg-gray-500/10'} ${!isPremium ? 'opacity-70' : ''}`}
-                    >
-                      {!isPremium ? <Lock size={16} /> : (isLoggedIn ? <Upload size={16} className="text-[#5865f2]" /> : <Lock size={16} />)}
-                      Экспорт в Drive
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-        </div>
-
-        <button 
-          onClick={onCreateNote} 
-          disabled={isCreatingGlobal}
-          className={`w-full bg-[#eb459e] text-white p-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all ${isCreatingGlobal ? 'opacity-70 cursor-wait' : 'hover:brightness-110 active:scale-95'}`}
+      {(!isMobile || showMobileSidebar) && (
+        <div 
+          ref={sidebarRef}
+          style={{ width: isMobile ? '100%' : sidebarWidth }}
+          className="flex flex-col gap-4 shrink-0 h-full relative"
         >
-          {isCreatingGlobal ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
-          {isCreatingGlobal ? 'Создание...' : 'Создать заметку'}
-        </button>
-
-        <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-          {notes.map(note => (
-            <div 
-              key={note.id} 
-              onClick={() => handleSelectNote(Number(note.id))} 
-              className={`p-4 rounded-2xl cursor-pointer transition-all border-2 group relative overflow-hidden ${
-                Number(selectedNoteId) === Number(note.id) 
-                  ? (isDarkMode ? 'bg-[#36393f] border-[#eb459e] shadow-lg' : 'bg-white border-[#eb459e] shadow-md ring-2 ring-[#eb459e]/10') 
-                  : 'border-transparent hover:bg-white/5'
-              }`}
-            >
-              <div className="pr-12">
-                <h3 className={`font-bold truncate text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{note.title || 'Без названия'}</h3>
-                <p className="text-[10px] mt-1 text-gray-500">{new Date(note.timestamp).toLocaleDateString()}</p>
-              </div>
-              
-              <button 
-                type="button"
-                onClick={(e) => handleDeleteClick(e, note.id)}
-                className={`absolute top-0 right-0 h-full transition-all flex items-center justify-center z-20 
-                  ${confirmDeleteId === note.id 
-                    ? 'w-24 bg-red-600 opacity-100 shadow-xl' 
-                    : 'w-12 bg-[#ed4245] opacity-0 group-hover:opacity-100 hover:bg-[#c03537]'}`}
-                title={confirmDeleteId === note.id ? "Нажмите для подтверждения" : "Удалить заметку"}
-              >
-                {confirmDeleteId === note.id ? (
-                   <span className="text-white text-xs font-bold animate-in fade-in whitespace-nowrap">Удалить?</span>
-                ) : (
-                   <Trash2 size={18} className="text-white pointer-events-none" />
+          <div className="flex items-center justify-between px-2">
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Заметки</h2>
+              <div className="relative">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
+                  className={`p-2 rounded-xl transition-colors relative ${isDarkMode ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-200 text-gray-600'}`}
+                >
+                   {syncStatus === 'loading' ? <Loader2 size={20} className="animate-spin text-[#eb459e]" /> : <MoreVertical size={20} />}
+                   {syncStatus === 'success' && <div className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full" />}
+                   {syncStatus === 'error' && <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />}
+                </button>
+                {showMenu && (
+                  <>
+                    <div className="fixed inset-0 z-[100]" onClick={() => setShowMenu(false)} />
+                    <div className={`absolute top-full right-0 mt-2 w-56 rounded-xl shadow-2xl border z-[101] overflow-hidden ${isDarkMode ? 'bg-[#2f3136] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-800'}`}>
+                      <button 
+                        onClick={handleImport} 
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-left transition-colors ${!isLoggedIn ? 'opacity-50 text-gray-500' : 'hover:bg-gray-500/10'} ${!isPremium ? 'opacity-70' : ''}`}
+                      >
+                        {!isPremium ? <Lock size={16} /> : (isLoggedIn ? <Download size={16} className="text-[#3ba55c]" /> : <Lock size={16} />)} 
+                        Импорт с Drive
+                      </button>
+                      <button 
+                        onClick={handleExport} 
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-left transition-colors ${!isLoggedIn ? 'opacity-50 text-gray-500' : 'hover:bg-gray-500/10'} ${!isPremium ? 'opacity-70' : ''}`}
+                      >
+                        {!isPremium ? <Lock size={16} /> : (isLoggedIn ? <Upload size={16} className="text-[#5865f2]" /> : <Lock size={16} />)}
+                        Экспорт в Drive
+                      </button>
+                    </div>
+                  </>
                 )}
-              </button>
-            </div>
-          ))}
+              </div>
+          </div>
+
+          <button 
+            onClick={() => {
+              onCreateNote();
+              if (isMobile) setShowMobileSidebar(false);
+            }} 
+            disabled={isCreatingGlobal}
+            className={`w-full bg-[#eb459e] text-white p-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all ${isCreatingGlobal ? 'opacity-70 cursor-wait' : 'hover:brightness-110 active:scale-95'}`}
+          >
+            {isCreatingGlobal ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
+            {isCreatingGlobal ? 'Создание...' : 'Создать заметку'}
+          </button>
+
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+            {notes.map(note => (
+              <div 
+                key={note.id} 
+                onClick={() => handleSelectNote(Number(note.id))} 
+                className={`p-4 rounded-2xl cursor-pointer transition-all border-2 group relative overflow-hidden ${
+                  Number(selectedNoteId) === Number(note.id) 
+                    ? (isDarkMode ? 'bg-[#36393f] border-[#eb459e] shadow-lg' : 'bg-white border-[#eb459e] shadow-md ring-2 ring-[#eb459e]/10') 
+                    : 'border-transparent hover:bg-white/5'
+                }`}
+              >
+                <div className="pr-12">
+                  <h3 className={`font-bold truncate text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{note.title || 'Без названия'}</h3>
+                  <p className="text-[10px] mt-1 text-gray-500">{new Date(note.timestamp).toLocaleDateString()}</p>
+                </div>
+                
+                <button 
+                  type="button"
+                  onClick={(e) => handleDeleteClick(e, note.id)}
+                  className={`absolute top-0 right-0 h-full transition-all flex items-center justify-center z-20 
+                    ${confirmDeleteId === note.id 
+                      ? 'w-24 bg-red-600 opacity-100 shadow-xl' 
+                      : 'w-12 bg-[#ed4245] opacity-0 group-hover:opacity-100 hover:bg-[#c03537]'}`}
+                  title={confirmDeleteId === note.id ? "Нажмите для подтверждения" : "Удалить заметку"}
+                >
+                  {confirmDeleteId === note.id ? (
+                     <span className="text-white text-xs font-bold animate-in fade-in whitespace-nowrap">Удалить?</span>
+                  ) : (
+                     <Trash2 size={18} className="text-white pointer-events-none" />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Drag Handle */}
-      <div
-        onMouseDown={startResizing}
-        className={`w-4 cursor-col-resize flex items-center justify-center group hover:scale-105 active:scale-100 z-10`}
-      >
-        <div className={`w-1 h-12 rounded-full transition-all duration-300 ${isResizing ? 'bg-[#eb459e] shadow-[0_0_15px_#eb459e]' : (isDarkMode ? 'bg-[#eb459e]/40 group-hover:bg-[#eb459e] group-hover:shadow-[0_0_10px_#eb459e]' : 'bg-[#eb459e]/30 group-hover:bg-[#eb459e]')}`} />
-      </div>
+      {!isMobile && (
+        <div
+          onMouseDown={startResizing}
+          className={`w-4 cursor-col-resize flex items-center justify-center group hover:scale-105 active:scale-100 z-10`}
+        >
+          <div className={`w-1 h-12 rounded-full transition-all duration-300 ${isResizing ? 'bg-[#eb459e] shadow-[0_0_15px_#eb459e]' : (isDarkMode ? 'bg-[#eb459e]/40 group-hover:bg-[#eb459e] group-hover:shadow-[0_0_10px_#eb459e]' : 'bg-[#eb459e]/30 group-hover:bg-[#eb459e]')}`} />
+        </div>
+      )}
 
       {/* Editor Area */}
-      <div className={`flex-1 rounded-[32px] overflow-hidden relative shadow-md transition-all ${isDarkMode ? 'bg-[#2f3136] border border-white/5' : 'bg-white'}`}>
-        {activeNote ? (
-          <NoteEditor key={activeNote.id} note={activeNote} onUpdate={handleNoteUpdate} isDarkMode={isDarkMode} />
-        ) : (
-          <div className="flex-1 h-full flex flex-col items-center justify-center opacity-30 text-gray-500">
-            <FileText size={80} className="mb-4" />
-            <h2 className="text-xl font-bold">Выберите заметку</h2>
-          </div>
-        )}
-      </div>
+      {(!isMobile || !showMobileSidebar) && (
+        <div className={`flex-1 rounded-[32px] overflow-hidden relative shadow-md transition-all flex flex-col ${isDarkMode ? 'bg-[#2f3136] border border-white/5' : 'bg-white'}`}>
+          {isMobile && (
+            <div className={`p-4 border-b ${isDarkMode ? 'border-white/5' : 'border-gray-200'} shrink-0`}>
+              <button 
+                onClick={() => setShowMobileSidebar(true)}
+                className={`flex items-center gap-2 text-sm font-bold ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                <ChevronLeft size={20} /> Назад к списку
+              </button>
+            </div>
+          )}
+          {activeNote ? (
+            <NoteEditor key={activeNote.id} note={activeNote} onUpdate={handleNoteUpdate} isDarkMode={isDarkMode} />
+          ) : (
+            <div className="flex-1 h-full flex flex-col items-center justify-center opacity-30 text-gray-500">
+              <FileText size={80} className="mb-4" />
+              <h2 className="text-xl font-bold">Выберите заметку</h2>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

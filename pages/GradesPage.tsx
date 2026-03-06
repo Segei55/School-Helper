@@ -10,6 +10,7 @@ interface GradesPageProps {
   isLoggedIn: boolean;
   isPremium?: boolean;
   onTriggerPremium?: (source: string) => void;
+  onSyncError?: () => void;
 }
 
 const SUBJECTS_LIST = [
@@ -31,7 +32,7 @@ const BUTTON_TEXT_COLORS = {
   2: 'text-[#7f1d1d]'
 };
 
-const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, isPremium, onTriggerPremium }) => {
+const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, isPremium, onTriggerPremium, onSyncError }) => {
   const [grades, setGrades] = useState<Grade[]>(() => {
     const saved = localStorage.getItem('school_helper_grades');
     if (saved) {
@@ -69,11 +70,13 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
 
   // --- Drive Synchronization Logic ---
   const handleExport = async () => {
-    // PREMIUM LOCK
+    // PREMIUM LOCK - TEMPORARILY DISABLED
+    /*
     if (!isPremium) {
        onTriggerPremium && onTriggerPremium('import_export');
        return;
     }
+    */
 
     if (!isLoggedIn) return; 
     if (!window.electron || !window.electron.driveExport) {
@@ -100,18 +103,23 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
         const success = await window.electron.driveExport('grades.json', jsonContent);
         setSyncStatus(success ? 'success' : 'error');
         setTimeout(() => setSyncStatus('idle'), 2500);
-    } catch (e) {
+    } catch (e: any) {
         console.error(e);
+        if (e.message && (e.message.includes("UNAUTHORIZED") || e.message.includes("NO_TOKEN")) && onSyncError) {
+             onSyncError();
+        }
         setSyncStatus('error');
     }
   };
 
   const handleImport = async () => {
-    // PREMIUM LOCK
+    // PREMIUM LOCK - TEMPORARILY DISABLED
+    /*
     if (!isPremium) {
        onTriggerPremium && onTriggerPremium('import_export');
        return;
     }
+    */
 
     if (!isLoggedIn) return;
     if (!window.electron || !window.electron.driveImport) {
@@ -145,8 +153,11 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
             alert("Файл grades.json не найден в корне Google Диска.");
             setSyncStatus('error');
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error(e);
+        if (e.message && (e.message.includes("UNAUTHORIZED") || e.message.includes("NO_TOKEN")) && onSyncError) {
+             onSyncError();
+        }
         setSyncStatus('error');
     }
   };
@@ -182,20 +193,20 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
   const stickyBg = isDarkMode ? 'bg-[#2f3136]/90' : 'bg-white/90';
 
   return (
-    <div className={`flex flex-col h-full w-full max-w-3xl mx-auto transition-colors duration-300 ${textColor} overflow-hidden`}>
+    <div className={`flex flex-col h-full w-full max-w-5xl mx-auto transition-colors duration-300 ${textColor} overflow-hidden`}>
       
       {/* 2. Scrollable Content (Subject Selector + Stats + Chart + List) */}
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1 relative">
         
         {/* Subject Selector (Now inside scrollable area) */}
-        <div className="mb-4 pt-1 animate-in fade-in slide-in-from-right-10 duration-500 sticky top-0 z-20">
+        <div className="mb-3 pt-1 animate-in fade-in slide-in-from-right-10 duration-500 sticky top-0 z-20">
             <div className={`pb-2 ${isDarkMode ? 'bg-[#2f3136]' : 'bg-white'}`}>
                 <label className={`text-[10px] font-bold uppercase tracking-wider ml-1 mb-1 block ${mutedText}`}>Выберите предмет</label>
                 <div className="relative">
                 <select
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value)}
-                    className={`w-full appearance-none p-4 pr-10 rounded-2xl outline-none focus:ring-2 focus:ring-[#5865f2] border font-bold text-lg cursor-pointer transition-all hover:shadow-md ${isDarkMode ? 'bg-[#202225] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-800'}`}
+                    className={`w-full appearance-none p-3 pr-10 rounded-2xl outline-none focus:ring-2 focus:ring-[#5865f2] border font-bold text-lg cursor-pointer transition-all hover:shadow-md ${isDarkMode ? 'bg-[#202225] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-800'}`}
                 >
                     <option value="general">Общий обзор (График)</option>
                     {SUBJECTS_LIST.map(subj => <option key={subj} value={subj}>{subj}</option>)}
@@ -206,22 +217,23 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
         </div>
 
         {selectedSubject === 'general' ? (
-          <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-300 pb-2">
+          <div className="flex flex-col gap-3 animate-in zoom-in-95 duration-300 pb-2">
              
              {/* Stats Card */}
-             <div className={`p-5 rounded-3xl border flex items-center justify-between shadow-lg relative overflow-hidden shrink-0 ${isDarkMode ? 'bg-gradient-to-br from-[#2f3136] to-[#202225] border-white/5' : 'bg-white border-gray-200'}`}>
+             <div className={`p-3 rounded-3xl border flex items-center justify-between shadow-lg relative overflow-hidden shrink-0 ${isDarkMode ? 'bg-gradient-to-br from-[#2f3136] to-[#202225] border-white/5' : 'bg-white border-gray-200'}`}>
                 <div className="z-10">
                     <p className={`text-xs font-bold uppercase ${mutedText} mb-1`}>Средний балл по всем предметам</p>
                     <div className="text-4xl font-extrabold text-[#5865f2] tracking-tighter">{average}</div>
                 </div>
-                <div className="w-14 h-14 rounded-full bg-[#5865f2]/20 flex items-center justify-center text-[#5865f2] z-10">
-                    <TrendingUp size={28} />
+                <div className="w-12 h-12 rounded-full bg-[#5865f2]/20 flex items-center justify-center text-[#5865f2] z-10">
+                    <TrendingUp size={24} />
                 </div>
                 <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-[#5865f2]/5 rounded-full blur-3xl pointer-events-none" />
              </div>
 
              {/* Chart */}
-             <div className={`h-[220px] shrink-0 rounded-3xl p-4 shadow-inner border relative ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+             <div className={`h-[220px] shrink-0 rounded-3xl p-2 shadow-inner border relative ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+                {/* TEMPORARILY HIDDEN
                 {!isPremium && (
                    <PremiumOverlay 
                      title="График успеваемости"
@@ -229,6 +241,7 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
                      onOpenModal={() => onTriggerPremium && onTriggerPremium('stats')}
                    />
                 )}
+                */}
                 {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
@@ -237,7 +250,7 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
                       <YAxis domain={[0, 5]} ticks={[2,3,4,5]} stroke={isDarkMode ? "#8e9297" : "#9ca3af"} tickLine={false} axisLine={false} tick={{fill: isDarkMode ? '#8e9297' : '#6b7280'}} />
                       <Tooltip 
                         cursor={{ fill: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }}
-                        formatter={(value: number) => [value, '']}
+                        formatter={(value: number | undefined) => [value, '']}
                         separator=""
                         contentStyle={{ 
                           backgroundColor: isDarkMode ? '#1a1c1e' : '#ffffff', 
@@ -276,8 +289,8 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
                         <div className="p-8 text-center opacity-30 text-sm">Оценок пока нет</div>
                     ) : (
                         filteredGrades.map((grade, i) => (
-                            <div key={grade.id} className={`flex items-center p-3 rounded-2xl shadow-sm border border-l-[6px] transition-all hover:translate-x-1 ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-white border-gray-200'}`} style={{ borderLeftColor: Number(grade.grade) >= 4 ? '#3ba55c' : Number(grade.grade) === 3 ? '#faa61a' : '#ed4245' }}>
-                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg font-bold mr-3 shrink-0 ${Number(grade.grade) === 5 ? 'bg-blue-500/20 text-[#60a5fa]' : Number(grade.grade) === 4 ? 'bg-green-500/20 text-[#a3e6aa]' : Number(grade.grade) === 3 ? 'bg-purple-500/20 text-[#d8b4fe]' : 'bg-red-500/20 text-[#fca5a5]'}`}>
+                            <div key={grade.id} className={`flex items-center p-2 rounded-2xl shadow-sm border border-l-[6px] transition-all hover:translate-x-1 ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-white border-gray-200'}`} style={{ borderLeftColor: Number(grade.grade) >= 4 ? '#3ba55c' : Number(grade.grade) === 3 ? '#faa61a' : '#ed4245' }}>
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-lg font-bold mr-3 shrink-0 ${Number(grade.grade) === 5 ? 'bg-blue-500/20 text-[#60a5fa]' : Number(grade.grade) === 4 ? 'bg-green-500/20 text-[#a3e6aa]' : Number(grade.grade) === 3 ? 'bg-purple-500/20 text-[#d8b4fe]' : 'bg-red-500/20 text-[#fca5a5]'}`}>
                                     {grade.grade}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -292,15 +305,15 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
              </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 animate-in slide-in-from-bottom-4 duration-500 pb-2">
+          <div className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 duration-500 pb-2">
             {/* Control Panel */}
-            <div className={`p-5 rounded-3xl border shadow-sm shrink-0 ${isDarkMode ? 'bg-[#2f3136] border-white/5' : 'bg-white border-gray-200'}`}>
-                <div className="flex justify-between items-center gap-2 mb-4">
+            <div className={`p-3 rounded-3xl border shadow-sm shrink-0 ${isDarkMode ? 'bg-[#2f3136] border-white/5' : 'bg-white border-gray-200'}`}>
+                <div className="flex justify-between items-center gap-2 mb-3">
                   {[2, 3, 4, 5].map((val) => (
                     <button 
                       key={val} 
                       onClick={() => addGrade(val)} 
-                      className={`flex-1 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-md transform transition-all hover:-translate-y-1 active:scale-95 hover:shadow-lg ${BUTTON_COLORS[val as 2|3|4|5]} ${BUTTON_TEXT_COLORS[val as 2|3|4|5]}`}
+                      className={`flex-1 h-12 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-md transform transition-all hover:-translate-y-1 active:scale-95 hover:shadow-lg ${BUTTON_COLORS[val as 2|3|4|5]} ${BUTTON_TEXT_COLORS[val as 2|3|4|5]}`}
                     >
                       {val}
                     </button>
@@ -329,8 +342,8 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
                    </div>
                 ) : (
                   filteredGrades.map((grade, i) => (
-                    <div key={grade.id} className={`flex items-center p-3 rounded-2xl shadow-sm border border-l-[6px] transition-all hover:translate-x-1 animate-in slide-in-from-left-5 duration-300 ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-white border-gray-200'}`} style={{ borderLeftColor: Number(grade.grade) >= 4 ? '#3ba55c' : Number(grade.grade) === 3 ? '#faa61a' : '#ed4245', animationDelay: `${i * 0.05}s` }}>
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xl font-bold mr-3 shrink-0 ${Number(grade.grade) === 5 ? 'bg-blue-500/20 text-[#60a5fa]' : Number(grade.grade) === 4 ? 'bg-green-500/20 text-[#a3e6aa]' : Number(grade.grade) === 3 ? 'bg-purple-500/20 text-[#d8b4fe]' : 'bg-red-500/20 text-[#fca5a5]'}`}>
+                    <div key={grade.id} className={`flex items-center p-2 rounded-2xl shadow-sm border border-l-[6px] transition-all hover:translate-x-1 animate-in slide-in-from-left-5 duration-300 ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-white border-gray-200'}`} style={{ borderLeftColor: Number(grade.grade) >= 4 ? '#3ba55c' : Number(grade.grade) === 3 ? '#faa61a' : '#ed4245', animationDelay: `${i * 0.05}s` }}>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xl font-bold mr-3 shrink-0 ${Number(grade.grade) === 5 ? 'bg-blue-500/20 text-[#60a5fa]' : Number(grade.grade) === 4 ? 'bg-green-500/20 text-[#a3e6aa]' : Number(grade.grade) === 3 ? 'bg-purple-500/20 text-[#d8b4fe]' : 'bg-red-500/20 text-[#fca5a5]'}`}>
                           {grade.grade}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -348,32 +361,34 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
       </div>
 
       {/* 3. Footer: Action Buttons (Fixed at bottom) */}
-      <div className={`shrink-0 mt-3 pt-3 border-t flex gap-3 ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
-         <button onClick={handleClearClick} className="flex-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 text-sm">
+      <div className={`shrink-0 mt-2 pt-2 border-t flex flex-col sm:flex-row gap-3 ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+         <button onClick={handleClearClick} className="w-full sm:flex-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 text-sm">
              <RotateCcw size={16} /> Очистить
          </button>
          
-         <button 
-           onClick={handleExport}
-           className={`flex-1 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm
-             ${!isPremium ? 'bg-gray-500/10 text-gray-500' : 'bg-[#5865f2] hover:bg-[#4752c4] text-white shadow-lg shadow-indigo-500/20'}
-             ${syncStatus === 'loading' ? 'opacity-70 cursor-wait' : ''}
-             `}
-         >
-            {!isPremium ? <Lock size={16} /> : (syncStatus === 'loading' ? <Loader2 size={16} className="animate-spin" /> : syncStatus === 'success' ? <CheckCircle size={16} /> : <Upload size={16} />)}
-            Экспорт
-         </button>
-         
-         <button 
-           onClick={handleImport}
-           className={`flex-1 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm
-             ${!isPremium ? 'bg-gray-500/10 text-gray-500' : 'bg-[#3ba55c] hover:bg-[#2d7d46] text-white shadow-lg shadow-green-500/20'}
-             ${syncStatus === 'loading' ? 'opacity-70 cursor-wait' : ''}
-             `}
-         >
-            {!isPremium ? <Lock size={16} /> : (syncStatus === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />)}
-            Импорт
-         </button>
+         <div className="flex gap-3 w-full sm:flex-[2]">
+           <button 
+             onClick={handleExport}
+             className={`flex-1 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm
+               bg-[#5865f2] hover:bg-[#4752c4] text-white shadow-lg shadow-indigo-500/20
+               ${syncStatus === 'loading' ? 'opacity-70 cursor-wait' : ''}
+               `}
+           >
+              {syncStatus === 'loading' ? <Loader2 size={16} className="animate-spin" /> : syncStatus === 'success' ? <CheckCircle size={16} /> : <Upload size={16} />}
+              Экспорт
+           </button>
+           
+           <button 
+             onClick={handleImport}
+             className={`flex-1 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 text-sm
+               bg-[#3ba55c] hover:bg-[#2d7d46] text-white shadow-lg shadow-green-500/20
+               ${syncStatus === 'loading' ? 'opacity-70 cursor-wait' : ''}
+               `}
+           >
+              {syncStatus === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              Импорт
+           </button>
+         </div>
       </div>
 
       {showClearModal && (

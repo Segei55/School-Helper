@@ -1,9 +1,12 @@
 
 import React, { useState, useRef, useEffect, useLayoutEffect, memo } from 'react';
-import { Send, User, Loader2, Sparkles, Brain, Trash2, Bot as BotIcon, AlertTriangle, StopCircle, Crown } from 'lucide-react';
+import { 
+  Send, User, Loader2, Sparkles, Brain, Trash2, Bot as BotIcon, 
+  AlertTriangle, StopCircle, Crown, Plus, HelpCircle, X, ChevronDown, Check, ExternalLink
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { UserInfo } from '../types';
+import { UserInfo, AIModel } from '../types';
 
 interface AIPageProps {
   isDarkMode?: boolean;
@@ -15,8 +18,10 @@ interface AIPageProps {
   onStop: () => void;
   onClear: () => void;
   selectedModel: string;
-  setSelectedModel: (model: string) => void;
+  setSelectedModel: (modelId: string) => void;
   isAppReady?: boolean;
+  aiModels: AIModel[];
+  setAiModels: React.Dispatch<React.SetStateAction<AIModel[]>>;
 }
 
 export interface ChatMessage {
@@ -129,7 +134,9 @@ const AIPage: React.FC<AIPageProps> = ({
     onClear,
     selectedModel,
     setSelectedModel,
-    isAppReady
+    isAppReady,
+    aiModels,
+    setAiModels
 }) => {
   const [input, setInput] = useState('');
   const [msgsLeft, setMsgsLeft] = useState<number>(8);
@@ -223,22 +230,252 @@ const AIPage: React.FC<AIPageProps> = ({
       setInput('');
   }
 
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showAddModel, setShowAddModel] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [newModelName, setNewModelName] = useState('');
+  const [newModelId, setNewModelId] = useState('');
+  const [newModelKey, setNewModelKey] = useState('');
+  const modelSelectorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+          if (modelSelectorRef.current && !modelSelectorRef.current.contains(event.target as Node)) {
+              setShowModelSelector(false);
+          }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleAddModel = () => {
+      if (!newModelName || !newModelId) return;
+      
+      const newModel: AIModel = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: newModelName,
+          modelId: newModelId,
+          apiKey: newModelKey || undefined
+      };
+      
+      setAiModels(prev => [...prev, newModel]);
+      setSelectedModel(newModel.id);
+      setShowAddModel(false);
+      setNewModelName('');
+      setNewModelId('');
+      setNewModelKey('');
+  };
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [modelToDelete, setModelToDelete] = useState<string | null>(null);
+
+  const handleDeleteModel = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      setModelToDelete(id);
+      setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteModel = () => {
+      if (!modelToDelete) return;
+      
+      setAiModels(prev => prev.filter(m => m.id !== modelToDelete));
+      if (selectedModel === modelToDelete) {
+          const defaultModel = aiModels.find(m => m.isDefault);
+          setSelectedModel(defaultModel?.id || aiModels[0]?.id || 'default');
+      }
+      
+      setShowDeleteConfirm(false);
+      setModelToDelete(null);
+  };
+
+  const currentModel = aiModels.find(m => m.id === selectedModel) || aiModels[0];
+
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-      <div className={`p-4 rounded-2xl flex flex-wrap gap-3 items-center justify-between shrink-0 transition-all ${isDarkMode ? 'bg-[#202225] text-white' : 'bg-white text-gray-900 shadow-sm border border-gray-100'}`}>
-         <div className="flex gap-3 items-center flex-1 min-w-0">
-           <div className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-colors ${isDarkMode ? 'bg-[#2f3136] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
-              <BotIcon size={18} className="text-[#5865f2]" />
-              <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase opacity-50 leading-none mb-0.5">Модель</span>
-                  <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>DeepSeek R1</span>
+      {/* --- DELETE CONFIRM MODAL --- */}
+      {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[102] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className={`w-full max-w-sm p-6 rounded-2xl shadow-2xl relative ${isDarkMode ? 'bg-[#2f3136] text-white border border-white/10' : 'bg-white text-gray-900'}`}>
+                  <h2 className="text-lg font-bold mb-2 flex items-center gap-2 text-red-500">
+                      <Trash2 size={20} />
+                      Удалить модель?
+                  </h2>
+                  <p className={`text-sm mb-6 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      Вы уверены, что хотите удалить эту модель из списка? Это действие нельзя отменить.
+                  </p>
+                  <div className="flex gap-3">
+                      <button 
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className={`flex-1 py-2 rounded-xl font-medium transition-colors ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'}`}
+                      >
+                          Отмена
+                      </button>
+                      <button 
+                          onClick={confirmDeleteModel}
+                          className="flex-1 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-colors shadow-lg shadow-red-500/20"
+                      >
+                          Удалить
+                      </button>
+                  </div>
               </div>
+          </div>
+      )}
+
+      {/* --- ADD MODEL MODAL --- */}
+      {showAddModel && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className={`w-full max-w-md p-6 rounded-2xl shadow-2xl relative ${isDarkMode ? 'bg-[#2f3136] text-white border border-white/10' : 'bg-white text-gray-900'}`}>
+                  <button onClick={() => setShowAddModel(false)} className="absolute top-4 right-4 opacity-50 hover:opacity-100"><X size={20}/></button>
+                  <button onClick={() => setShowHelp(true)} className="absolute top-4 right-12 opacity-50 hover:opacity-100 text-[#5865f2]"><HelpCircle size={20}/></button>
+                  
+                  <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                      <BotIcon className="text-[#5865f2]" />
+                      Добавить нейросеть
+                  </h2>
+                  
+                  <div className="space-y-4">
+                      <div>
+                          <label className="block text-xs font-bold uppercase opacity-50 mb-1">Название (для себя)</label>
+                          <input 
+                              value={newModelName}
+                              onChange={(e) => setNewModelName(e.target.value)}
+                              placeholder="Например: GPT-4o Mini"
+                              className={`w-full p-3 rounded-xl outline-none border transition-all focus:border-[#5865f2] ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold uppercase opacity-50 mb-1">ID Модели (OpenRouter)</label>
+                          <input 
+                              value={newModelId}
+                              onChange={(e) => setNewModelId(e.target.value)}
+                              placeholder="openai/gpt-4o-mini"
+                              className={`w-full p-3 rounded-xl outline-none border transition-all focus:border-[#5865f2] ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold uppercase opacity-50 mb-1">API Key (OpenRouter)</label>
+                          <input 
+                              value={newModelKey}
+                              onChange={(e) => setNewModelKey(e.target.value)}
+                              type="password"
+                              placeholder="sk-or-..."
+                              className={`w-full p-3 rounded-xl outline-none border transition-all focus:border-[#5865f2] ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}
+                          />
+                          <p className="text-[10px] opacity-50 mt-1">Оставьте пустым, чтобы использовать встроенный ключ (только для бесплатных моделей)</p>
+                      </div>
+                      
+                      <button 
+                          onClick={handleAddModel}
+                          disabled={!newModelName || !newModelId}
+                          className="w-full py-3 rounded-xl bg-[#5865f2] hover:bg-[#4752c4] text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                      >
+                          Добавить
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* --- HELP MODAL --- */}
+      {showHelp && (
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className={`w-full max-w-lg p-6 rounded-2xl shadow-2xl relative ${isDarkMode ? 'bg-[#2f3136] text-white border border-white/10' : 'bg-white text-gray-900'}`}>
+                  <button onClick={() => setShowHelp(false)} className="absolute top-4 right-4 opacity-50 hover:opacity-100"><X size={20}/></button>
+                  
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                      <HelpCircle className="text-[#5865f2]" />
+                      Как подключить OpenRouter?
+                  </h2>
+                  
+                  <div className={`space-y-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      <p>OpenRouter — это агрегатор нейросетей, который дает доступ к GPT-4, Claude 3, Llama 3 и сотням других моделей через один API.</p>
+                      
+                      <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
+                          <h3 className="font-bold mb-2 flex items-center gap-2">1. Получите API Key</h3>
+                          <ol className="list-decimal list-inside space-y-1 opacity-80">
+                              <li>Зайдите на <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-[#5865f2] hover:underline">openrouter.ai/keys</a></li>
+                              <li>Войдите через Google или GitHub</li>
+                              <li>Нажмите "Create Key"</li>
+                              <li>Скопируйте ключ (начинается с sk-or-...)</li>
+                          </ol>
+                      </div>
+
+                      <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
+                          <h3 className="font-bold mb-2 flex items-center gap-2">2. Выберите модель</h3>
+                          <ol className="list-decimal list-inside space-y-1 opacity-80">
+                              <li>Перейдите на <a href="https://openrouter.ai/models" target="_blank" rel="noreferrer" className="text-[#5865f2] hover:underline">openrouter.ai/models</a></li>
+                              <li>Выберите любую модель (например, google/gemini-2.0-flash-001)</li>
+                              <li>Скопируйте её ID (он написан серым цветом под названием)</li>
+                          </ol>
+                      </div>
+                      
+                      <p className="opacity-60 text-xs">
+                          Примечание: Многие модели на OpenRouter бесплатны (Free), но для мощных моделей (GPT-4, Claude 3 Opus) нужно пополнить баланс (от $5).
+                      </p>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      <div className={`p-2 sm:p-4 rounded-2xl flex flex-wrap gap-3 items-center justify-between shrink-0 transition-all ${isDarkMode ? 'bg-[#202225] text-white' : 'bg-white text-gray-900 shadow-sm border border-gray-100'}`}>
+         <div className="flex gap-3 items-center flex-1 min-w-0">
+           
+           {/* MODEL SELECTOR */}
+           <div className="relative" ref={modelSelectorRef}>
+               <button 
+                  onClick={() => setShowModelSelector(!showModelSelector)}
+                  className={`relative flex items-center gap-2 px-2 py-2 sm:px-4 sm:py-2.5 rounded-xl border transition-all hover:bg-opacity-80 active:scale-95 ${isDarkMode ? 'bg-[#2f3136] border-white/5 hover:bg-[#36393f]' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+               >
+                  <BotIcon size={18} className="text-[#5865f2]" />
+                  <div className="flex flex-col items-start">
+                      <span className="hidden sm:block text-[10px] font-bold uppercase opacity-50 leading-none mb-0.5">Модель</span>
+                      <div className="flex items-center gap-1">
+                          <span className={`text-sm font-bold truncate max-w-[100px] sm:max-w-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{currentModel?.name || 'Unknown'}</span>
+                          <ChevronDown size={12} className="opacity-50" />
+                      </div>
+                  </div>
+               </button>
+
+               {/* DROPDOWN */}
+               {showModelSelector && (
+                   <div className={`absolute top-full left-0 mt-2 w-64 rounded-xl shadow-2xl border overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100 ${isDarkMode ? 'bg-[#2f3136] border-white/10' : 'bg-white border-gray-200'}`}>
+                       <div className="max-h-64 overflow-y-auto custom-scrollbar p-1">
+                           {aiModels.map(model => (
+                               <button
+                                  key={model.id}
+                                  onClick={() => { setSelectedModel(model.id); setShowModelSelector(false); }}
+                                  className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between group transition-colors ${selectedModel === model.id ? (isDarkMode ? 'bg-[#5865f2]/20 text-[#5865f2]' : 'bg-indigo-50 text-indigo-600') : (isDarkMode ? 'hover:bg-white/5 text-gray-300' : 'hover:bg-gray-50 text-gray-700')}`}
+                               >
+                                   <span className="truncate font-medium text-sm">{model.name}</span>
+                                   {selectedModel === model.id && <Check size={14} />}
+                                   {!model.isDefault && (
+                                       <div 
+                                          onClick={(e) => handleDeleteModel(e, model.id)}
+                                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
+                                       >
+                                           <Trash2 size={12} />
+                                       </div>
+                                   )}
+                               </button>
+                           ))}
+                       </div>
+                       <div className={`p-1 border-t ${isDarkMode ? 'border-white/10' : 'border-gray-100'}`}>
+                           <button 
+                              onClick={() => { setShowAddModel(true); setShowModelSelector(false); }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold uppercase transition-colors ${isDarkMode ? 'text-gray-400 hover:bg-white/5 hover:text-white' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
+                           >
+                               <Plus size={14} />
+                               Добавить модель
+                           </button>
+                       </div>
+                   </div>
+               )}
            </div>
            
            {isLoading && (
                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#5865f2]/10 text-[#5865f2]">
                    <Loader2 size={12} className="animate-spin" />
-                   <span className="text-xs font-bold">DeepSeek думает...</span>
+                   <span className="text-xs font-bold">{currentModel?.name.split(' ')[0]} думает...</span>
                </div>
            )}
          </div>
@@ -261,9 +498,9 @@ const AIPage: React.FC<AIPageProps> = ({
                 </div>
                 <div className="absolute top-0 left-0 w-32 h-32 bg-[#5865f2] blur-[80px] opacity-20 animate-pulse"></div>
              </div>
-            <h3 className={`font-extrabold text-2xl mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>DeepSeek R1</h3>
+            <h3 className={`font-extrabold text-2xl mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Qwen 2.5 VL</h3>
             <div className={`max-w-xs space-y-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-               <p className="text-sm font-medium">Ваш умный помощник на базе DeepSeek. Решает задачи, пишет код и объясняет сложные темы с использованием цепочки рассуждений.</p>
+               <p className="text-sm font-medium">Ваш умный помощник на базе Qwen. Решает задачи, пишет код и объясняет сложные темы с использованием цепочки рассуждений.</p>
             </div>
           </div>
         ) : (
@@ -273,8 +510,9 @@ const AIPage: React.FC<AIPageProps> = ({
         )}
       </div>
 
-      <div className="p-4 pt-0 max-w-4xl mx-auto w-full">
-        {/* FREE PLAN LIMIT INDICATOR */}
+      <div className="p-2 sm:p-4 pt-0 max-w-4xl mx-auto w-full">
+        {/* FREE PLAN LIMIT INDICATOR - TEMPORARILY HIDDEN */}
+        {/*
         {!userInfo?.isPremium && (
             <div className="flex justify-center mb-2 animate-in fade-in slide-in-from-bottom-1">
                 <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 ${msgsLeft > 0 ? 'bg-[#5865f2]/10 text-[#5865f2]' : 'bg-red-500/10 text-red-500'}`}>
@@ -286,6 +524,7 @@ const AIPage: React.FC<AIPageProps> = ({
                 </div>
             </div>
         )}
+        */}
 
         <div className={`flex flex-col gap-2 p-1.5 rounded-[24px] border shadow-2xl transition-all focus-within:ring-2 focus-within:ring-[#5865f2]/50 focus-within:translate-y-[-2px] ${isDarkMode ? 'bg-[#2f3136] border-[#202225]' : 'bg-white border-gray-100'}`}>
             <div className="flex items-end gap-2">
@@ -321,11 +560,13 @@ const AIPage: React.FC<AIPageProps> = ({
                 )}
             </div>
         </div>
+        {/* TEMPORARILY HIDDEN
         {!userInfo?.isPremium && (
              <div className={`text-center mt-2 text-[10px] font-medium opacity-40 ${isDarkMode ? 'text-white' : 'text-black'}`}>
                 История чата очистится при перезагрузке (Premium функция)
              </div>
         )}
+        */}
       </div>
     </div>
   );

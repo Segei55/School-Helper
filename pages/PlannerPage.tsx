@@ -10,6 +10,7 @@ interface PlannerPageProps {
   setEvents: React.Dispatch<React.SetStateAction<PlannerEvent[]>>;
   isPremium?: boolean;
   onTriggerPremium?: (source: string) => void;
+  onSyncError?: () => void;
 }
 
 const MONTHS = [
@@ -159,7 +160,7 @@ const TimeColumn: React.FC<TimeColumnProps> = ({ max, value, onChange, label, is
   );
 };
 
-const PlannerPage: React.FC<PlannerPageProps> = ({ isDarkMode = true, isLoggedIn, events, setEvents, isPremium, onTriggerPremium }) => {
+const PlannerPage: React.FC<PlannerPageProps> = ({ isDarkMode = true, isLoggedIn, events, setEvents, isPremium, onTriggerPremium, onSyncError }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   
@@ -174,10 +175,12 @@ const PlannerPage: React.FC<PlannerPageProps> = ({ isDarkMode = true, isLoggedIn
   const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
   const handleExport = async () => {
+    /* TEMPORARILY DISABLED
     if (!isPremium) {
        onTriggerPremium && onTriggerPremium('import_export');
        return;
     }
+    */
     if (!isLoggedIn || !window.electron?.driveExport) return;
     setSyncStatus('loading');
     try {
@@ -185,17 +188,22 @@ const PlannerPage: React.FC<PlannerPageProps> = ({ isDarkMode = true, isLoggedIn
       const success = await window.electron.driveExport('planner.json', content);
       setSyncStatus(success ? 'success' : 'error');
       setTimeout(() => setSyncStatus('idle'), 2000);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      if (e.message && (e.message.includes("UNAUTHORIZED") || e.message.includes("NO_TOKEN")) && onSyncError) {
+             onSyncError();
+      }
       setSyncStatus('error');
     }
   };
 
   const handleImport = async () => {
+    /* TEMPORARILY DISABLED
     if (!isPremium) {
        onTriggerPremium && onTriggerPremium('import_export');
        return;
     }
+    */
     if (!isLoggedIn || !window.electron?.driveImport) return;
     if (!confirm("Импорт объединит облачные задачи с локальными по принципу 'самая новая побеждает'. Продолжить?")) return;
     setSyncStatus('loading');
@@ -216,8 +224,11 @@ const PlannerPage: React.FC<PlannerPageProps> = ({ isDarkMode = true, isLoggedIn
         setSyncStatus('error');
       }
       setTimeout(() => setSyncStatus('idle'), 2000);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      if (e.message && (e.message.includes("UNAUTHORIZED") || e.message.includes("NO_TOKEN")) && onSyncError) {
+             onSyncError();
+      }
       setSyncStatus('error');
     }
   };
@@ -361,27 +372,35 @@ const PlannerPage: React.FC<PlannerPageProps> = ({ isDarkMode = true, isLoggedIn
               <h2 className="text-2xl font-bold">Задачи</h2>
               <p className={`text-sm ${subTextColor}`}>{selectedDate.toLocaleDateString()}</p>
            </div>
-           <button onClick={() => {
-              // Reset modal state
-              const now = new Date();
-              setSelHour(now.getHours());
-              setSelMinute(now.getMinutes());
-              setIsModalOpen(true);
-           }} className="w-12 h-12 rounded-2xl bg-[#9b84ec] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95">
-              <Plus size={24} />
-           </button>
-        </div>
+           <div className="flex items-center gap-2">
+              {/* Sync Buttons */}
+              <div className="flex items-center gap-1 mr-2">
+                 <button 
+                   onClick={handleImport} 
+                   className={`p-2 rounded-xl transition-colors ${!isLoggedIn ? 'opacity-30' : 'hover:bg-gray-500/10'} text-gray-500`}
+                   title="Импорт из облака"
+                 >
+                    {syncStatus === 'loading' ? <Loader2 size={20} className="animate-spin text-[#9b84ec]" /> : <Download size={20} />}
+                 </button>
+                 <button 
+                   onClick={handleExport} 
+                   className={`p-2 rounded-xl transition-colors ${!isLoggedIn ? 'opacity-30' : 'hover:bg-gray-500/10'} text-gray-500`}
+                   title="Экспорт в облако"
+                 >
+                   {syncStatus === 'success' ? <CheckCircle size={20} className="text-green-500" /> : (syncStatus === 'error' ? <AlertTriangle size={20} className="text-red-500" /> : <Upload size={20} />)}
+                 </button>
+              </div>
 
-        <div className={`p-3 rounded-xl border flex items-center justify-between shrink-0 ${taskCardBg}`}>
-          <div className="flex items-center gap-2 opacity-50 text-xs font-bold uppercase"><Cloud size={14} /> Синхронизация</div>
-          <div className="flex gap-2">
-             <button onClick={handleImport} className={`p-2 rounded-lg transition-colors ${!isLoggedIn ? 'opacity-30' : 'hover:bg-gray-500/20'} ${!isPremium ? 'opacity-70' : ''}`}>
-                {!isPremium ? <Lock size={16} /> : (syncStatus === 'loading' ? <Loader2 size={16} className="animate-spin text-[#9b84ec]" /> : <Download size={16} />)}
-             </button>
-             <button onClick={handleExport} className={`p-2 rounded-lg transition-colors ${!isLoggedIn ? 'opacity-30' : 'hover:bg-gray-500/20'} ${!isPremium ? 'opacity-70' : ''}`}>
-               {!isPremium ? <Lock size={16} /> : (syncStatus === 'success' ? <CheckCircle size={16} className="text-green-500" /> : (syncStatus === 'error' ? <AlertTriangle size={16} className="text-red-500" /> : <Upload size={16} />))}
-             </button>
-          </div>
+              <button onClick={() => {
+                 // Reset modal state
+                 const now = new Date();
+                 setSelHour(now.getHours());
+                 setSelMinute(now.getMinutes());
+                 setIsModalOpen(true);
+              }} className="w-12 h-12 rounded-2xl bg-[#9b84ec] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 active:scale-95">
+                 <Plus size={24} />
+              </button>
+           </div>
         </div>
 
         <div className={`flex-1 rounded-3xl p-4 overflow-y-auto space-y-3 custom-scrollbar min-h-[300px] ${cardBg}`}>
@@ -439,12 +458,14 @@ const PlannerPage: React.FC<PlannerPageProps> = ({ isDarkMode = true, isLoggedIn
                     autoFocus 
                  />
                  
-                 {/* PREMIUM REMINDER LOCK */}
+                 {/* PREMIUM REMINDER LOCK - TEMPORARILY DISABLED */}
                  <div className={`flex items-center gap-3 p-3 rounded-xl border relative overflow-hidden ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
                     <Bell size={18} className={isDarkMode ? 'text-[#9b84ec]' : 'text-gray-500'} />
                     <span className={`text-xs font-bold uppercase flex-1 ${subTextColor}`}>Напомнить за (мин):</span>
                     
-                    {isPremium ? (
+                    {/* 
+                    {isPremium ? ( 
+                    */}
                         <input 
                            type="number" 
                            min="0" 
@@ -453,12 +474,14 @@ const PlannerPage: React.FC<PlannerPageProps> = ({ isDarkMode = true, isLoggedIn
                            onChange={e => setReminderMinutes(e.target.value)}
                            className={`w-16 bg-transparent text-right font-bold outline-none ${textColor}`} 
                         />
+                    {/* 
                     ) : (
                         <div onClick={() => onTriggerPremium && onTriggerPremium('reminder')} className="flex items-center gap-2 cursor-pointer bg-[#5865f2]/10 px-2 py-1 rounded text-[#5865f2]">
                             <span className="text-xs font-bold">Premium</span>
                             <Lock size={12} />
                         </div>
-                    )}
+                    )} 
+                    */}
                  </div>
 
                  <button 

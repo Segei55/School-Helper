@@ -213,11 +213,11 @@ const TimerPage: React.FC<TimerPageProps> = ({
       {isSetupMode ? (
         // --- SETUP MODE (WHEELS) ---
         <div className="flex flex-col items-center animate-in zoom-in-95 duration-300">
-           <div className={`p-8 rounded-3xl shadow-2xl border mb-10 flex gap-2 md:gap-8 items-center ${containerBg} ${isDarkMode ? 'border-white/5' : 'border-gray-200'}`}>
+           <div className={`p-4 sm:p-8 rounded-3xl shadow-2xl border mb-10 flex gap-2 md:gap-8 items-center ${containerBg} ${isDarkMode ? 'border-white/5' : 'border-gray-200'}`}>
               <TimeColumn max={23} value={pickHours} onChange={setPickHours} label="Часы" isDarkMode={isDarkMode} />
-              <div className={`h-[150px] flex items-center text-4xl font-bold opacity-10 pb-4 ${textColor}`}>:</div>
+              <div className={`h-[150px] flex items-center text-2xl sm:text-4xl font-bold opacity-10 pb-4 ${textColor}`}>:</div>
               <TimeColumn max={59} value={pickMinutes} onChange={setPickMinutes} label="Минуты" isDarkMode={isDarkMode} />
-              <div className={`h-[150px] flex items-center text-4xl font-bold opacity-10 pb-4 ${textColor}`}>:</div>
+              <div className={`h-[150px] flex items-center text-2xl sm:text-4xl font-bold opacity-10 pb-4 ${textColor}`}>:</div>
               <TimeColumn max={59} value={pickSeconds} onChange={setPickSeconds} label="Секунды" isDarkMode={isDarkMode} />
            </div>
 

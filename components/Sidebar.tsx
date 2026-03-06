@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { SectionId, UserInfo } from '../types';
-import { SECTIONS, getIcon } from '../constants';
-import { School, Menu } from 'lucide-react';
+import { SECTIONS, TEACHER_SECTIONS, getIcon } from '../constants';
+import { School, Menu, ArrowLeft } from 'lucide-react';
 
 interface SidebarProps {
   activeId: SectionId;
@@ -11,10 +11,22 @@ interface SidebarProps {
   userInfo: UserInfo | null;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  sidebarMode: 'main' | 'teacher';
+  onBackToMain: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isDarkMode, userInfo, isCollapsed, onToggleCollapse }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  activeId, 
+  onSelect, 
+  isDarkMode, 
+  userInfo, 
+  isCollapsed, 
+  onToggleCollapse,
+  sidebarMode,
+  onBackToMain
+}) => {
   const isSettingsActive = activeId === SectionId.Settings;
+  const currentSections = sidebarMode === 'main' ? SECTIONS : TEACHER_SECTIONS;
 
   return (
     <div className={`flex h-full transition-all duration-300 ease-in-out border-r ${isCollapsed ? 'w-[72px]' : 'w-[260px]'} ${isDarkMode ? 'bg-[#2f3136] border-[#202225]' : 'bg-[#f2f3f5] border-[#e3e5e8]'}`}>
@@ -86,35 +98,85 @@ const Sidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isDarkMode, userI
             <div className={`h-[1px] rounded-full w-full opacity-60 ${isDarkMode ? 'bg-[#36393f]' : 'bg-[#d4d7dc]'}`} />
           </div>
 
+          {/* Back to Main Button (Only in Teacher Mode) */}
+          {sidebarMode === 'teacher' && (
+             <>
+               <button
+                  onClick={onBackToMain}
+                  className={`w-full group flex items-center rounded-md transition-all duration-200 relative overflow-hidden h-10 px-3 shrink-0 mb-1
+                    ${isDarkMode ? 'text-[#8e9297] hover:bg-[#35383c] hover:text-[#dcddde]' : 'text-gray-500 hover:bg-[#e9ecef] hover:text-gray-900'}
+                  `}
+                  title={isCollapsed ? "На главную" : ''}
+                >
+                  <div className="w-6 flex items-center justify-center shrink-0">
+                    <ArrowLeft size={20} />
+                  </div>
+                  
+                  <div className={`overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap ml-3 ${isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[180px] opacity-100'}`}>
+                    <span className="text-[14px] font-medium">
+                      На главную
+                    </span>
+                  </div>
+                </button>
+                {/* Divider after Back to Main */}
+                <div className="px-2 py-2 shrink-0">
+                  <div className={`h-[1px] rounded-full w-full opacity-60 ${isDarkMode ? 'bg-[#36393f]' : 'bg-[#d4d7dc]'}`} />
+                </div>
+             </>
+          )}
+
           {/* Tools List */}
-          {SECTIONS.filter(s => s.id !== SectionId.Settings).map((section) => {
+          {currentSections.filter(s => {
+            if (s.id === SectionId.Settings) return false;
+            // Only show Teacher section if user has teacher role (in main mode)
+            if (sidebarMode === 'main' && s.id === SectionId.Teacher) {
+                return userInfo?.role === 'teacher';
+            }
+            return true;
+          }).map((section) => {
             const isActive = activeId === section.id;
+            const isTeacherTab = section.id === SectionId.Teacher && sidebarMode === 'main';
+            
             return (
-              <button
-                key={section.id}
-                onClick={() => onSelect(section.id)}
-                className={`w-full group flex items-center rounded-md transition-all duration-200 relative overflow-hidden h-10 px-3 shrink-0
-                  ${isActive 
-                    ? (isDarkMode ? 'bg-[#424549] text-white' : 'bg-[#dee2e6] text-gray-900') 
-                    : (isDarkMode ? 'text-[#8e9297] hover:bg-[#35383c] hover:text-[#dcddde]' : 'text-gray-500 hover:bg-[#e9ecef] hover:text-gray-900')
-                  }
-                `}
-                title={isCollapsed ? section.label : ''}
-              >
-                {isActive && (
-                  <div className={`absolute left-0 w-1 rounded-r-full transition-all duration-300 ${isCollapsed ? 'h-8' : 'h-5'} ${isDarkMode ? 'bg-white' : 'bg-gray-800'}`} />
+              <React.Fragment key={section.id}>
+                <button
+                  onClick={() => onSelect(section.id)}
+                  className={`w-full group flex items-center rounded-md transition-all duration-200 relative overflow-hidden h-10 px-3 shrink-0
+                    ${isActive 
+                      ? '' 
+                      : (isDarkMode ? 'text-[#8e9297] hover:bg-[#35383c] hover:text-[#dcddde]' : 'text-gray-500 hover:bg-[#e9ecef] hover:text-gray-900')
+                    }
+                  `}
+                  style={isActive ? {
+                    backgroundColor: `${section.color}1A`,
+                    color: section.color
+                  } : undefined}
+                  title={isCollapsed ? section.label : ''}
+                >
+                  {isActive && (
+                    <div 
+                      className={`absolute left-0 w-1 rounded-r-full transition-all duration-300 ${isCollapsed ? 'h-8' : 'h-5'}`} 
+                      style={{ backgroundColor: section.color }}
+                    />
+                  )}
+                  
+                  <div className="w-6 flex items-center justify-center shrink-0" style={{ color: isActive ? section.color : 'inherit' }}>
+                    {getIcon(section.icon, 20)}
+                  </div>
+                  
+                  <div className={`overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap ml-3 ${isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[180px] opacity-100'}`}>
+                    <span className={`text-[14px] ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                      {section.label}
+                    </span>
+                  </div>
+                </button>
+
+                {isTeacherTab && (
+                  <div className="px-2 py-2 shrink-0">
+                    <div className={`h-[1px] rounded-full w-full opacity-60 ${isDarkMode ? 'bg-[#36393f]' : 'bg-[#d4d7dc]'}`} />
+                  </div>
                 )}
-                
-                <div className="w-6 flex items-center justify-center shrink-0" style={{ color: isActive ? section.color : 'inherit' }}>
-                  {getIcon(section.icon, 20)}
-                </div>
-                
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap ml-3 ${isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[180px] opacity-100'}`}>
-                  <span className={`text-[14px] ${isActive ? 'font-semibold' : 'font-medium'}`}>
-                    {section.label}
-                  </span>
-                </div>
-              </button>
+              </React.Fragment>
             );
           })}
         </div>

@@ -10,6 +10,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
+    "lint": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview",
     "electron:start": "electron .",
@@ -22,15 +23,22 @@
     "build:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@google/genai": "^1.34.0",
+    "canvas-confetti": "^1.9.4",
     "lucide-react": "^0.562.0",
+    "motion": "^12.35.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^9.0.1",
+    "react-router-dom": "^7.13.1",
     "recharts": "^3.6.0",
     "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

@@ -1,6 +1,6 @@
 
 /**
- * Сервис для работы с ИИ через OpenRouter (DeepSeek)
+ * Сервис для работы с ИИ через OpenRouter
  */
 
 interface ChatMessage {
@@ -9,15 +9,14 @@ interface ChatMessage {
 }
 
 /**
- * Стриминг ответа от DeepSeek
- * Если мы в Electron - используем безопасный IPC канал.
- * Если мы в Web - используем прямой fetch (требует настройки прокси в будущем для безопасности, сейчас работает только в dev/если ключ есть)
+ * Стриминг ответа от OpenRouter
  */
 export const streamMessageFromGemini = async (
   message: string, 
   history: any[],
-  modelName: string = "deepseek/deepseek-r1",
+  modelName: string = "qwen/qwen3-vl-30b-a3b-thinking",
   systemInstruction: string = 'Ты — классный парень и школьный помощник. Общайся на русском языке, будь дружелюбным, используй эмодзи 📚✨. Объясняй сложные темы просто и понятно, как друг.',
+  apiKey?: string,
   signal?: AbortSignal
 ) => {
   
@@ -28,7 +27,7 @@ export const streamMessageFromGemini = async (
   }));
   messages.push({ role: 'user', content: message });
 
-  // 1. ELECTRON SAFE MODE
+  // 1. ELECTRON SAFE MODE (If available)
   if (window.electron && window.electron.streamAiRequest) {
       // Очищаем старые листенеры
       window.electron.removeAiListeners();
@@ -92,9 +91,78 @@ export const streamMessageFromGemini = async (
       };
   }
 
-  // 2. WEB MODE (UNSAFE FOR PRODUCTION KEYS)
-  // В веб-версии ключа нет в сборке (мы его убрали из vite.config), поэтому тут будет ошибка,
-  // если пользователь не настроит свой сервер или прокси.
-  // Для совместимости оставим код, но он не будет работать без backend-proxy.
-  throw new Error("В веб-версии ИИ временно недоступен без серверной части. Скачайте приложение для ПК.");
+  // 2. WEB MODE (Direct OpenRouter Call)
+  const DEFAULT_API_KEY = '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';
+  const API_KEY = apiKey || DEFAULT_API_KEY;
+  
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+        "Authorization": `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": window.location.origin, // Required by OpenRouter
+        "X-Title": "School Helper" // Optional
+        },
+        body: JSON.stringify({
+        model: modelName,
+        messages: [
+            { role: "system", content: systemInstruction },
+            ...messages
+        ],
+        stream: true
+        }),
+        signal
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`OpenRouter API Error: ${response.status} ${errText}`);
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    return {
+        [Symbol.asyncIterator]: async function* () {
+            if (!reader) return;
+            try {
+                let buffer = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
+                    
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (trimmed.startsWith('data: ')) {
+                            const data = trimmed.slice(6);
+                            if (data === '[DONE]') return;
+                            try {
+                                const json = JSON.parse(data);
+                                const content = json.choices[0]?.delta?.content || "";
+                                if (content) yield { text: content };
+                            } catch (e) {
+                                // ignore parse errors for partial chunks
+                            }
+                        }
+                    }
+                }
+            } finally {
+                reader.releaseLock();
+            }
+        }
+    };
+  } catch (error: any) {
+      if (error.name === 'AbortError') {
+          throw error;
+      }
+      console.error("AI Service Error:", error);
+      throw new Error(`Ошибка подключения к ИИ: ${error.message}`);
+  }
 };

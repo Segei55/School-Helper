@@ -1,70 +1,109 @@
 
 import React, { useState } from 'react';
-import { LogIn, User, TestTube, School } from 'lucide-react';
+import { LogIn, User, School, GraduationCap, Backpack } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onGoogleLogin: () => void;
-  onDevLogin: () => void;
-  onSkip: (persist: boolean) => void;
+  onSkip: (persist: boolean, role?: 'student' | 'teacher') => void;
   isDarkMode: boolean;
   currentOrigin?: string;
+  onOpenBrowser: (url: string) => void;
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ 
   onGoogleLogin, 
-  onDevLogin,
   onSkip, 
   isDarkMode, 
-  currentOrigin = window.location.origin
+  currentOrigin = window.location.origin,
+  onOpenBrowser
 }) => {
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
+
+  const handleAnonymousClick = () => {
+    setShowRoleSelection(true);
+  };
+
+  const handleRoleSelect = (role: 'student' | 'teacher') => {
+    // Save role preference and proceed
+    localStorage.setItem('user_role', role);
+    onSkip(dontShowAgain, role);
+  };
 
   return (
-    <div className={`flex flex-col items-center justify-center min-h-screen w-full transition-colors duration-500 relative p-4 ${isDarkMode ? 'bg-[#202225] text-white' : 'bg-[#f8f9fa] text-gray-900'}`}>
-      <div className={`max-w-2xl w-full p-6 md:p-12 rounded-2xl text-center flex flex-col items-center gap-6 md:gap-8 ${isDarkMode ? 'bg-[#2f3136]' : 'bg-white shadow-2xl'}`}>
+    <div className={`flex flex-col items-center justify-center min-h-screen w-full transition-colors duration-500 relative p-4 ${isDarkMode ? 'bg-[#0f1014] text-white' : 'bg-[#f8f9fa] text-gray-900'}`}>
+      <div className={`max-w-[480px] w-full p-8 rounded-[32px] text-center flex flex-col items-center relative overflow-hidden ${isDarkMode ? 'bg-[#1e1f22] border border-white/5' : 'bg-white shadow-2xl'}`}>
         
-        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-[#5865f2] flex items-center justify-center text-white shadow-lg shrink-0">
-          <School className="w-12 h-12 md:w-16 md:h-16" />
-        </div>
-        
-        <div>
-          <h1 className="text-2xl md:text-4xl font-extrabold mb-4">Школьный Помощник</h1>
-          <p className={`text-sm md:text-lg opacity-80 max-w-lg mx-auto leading-relaxed ${isDarkMode ? 'text-[#b9bbbe]' : 'text-gray-600'}`}>
-            Рад приветствовать Вас! Войдите в аккаунт для синхронизации, либо войдите анонимно (позднее будет возможность войти в аккаунт в пункте "настройки").
+        {/* Logo Area */}
+        <div className="mb-8 relative">
+          <div className="w-20 h-20 rounded-3xl bg-[#5865f2]/10 flex items-center justify-center text-[#5865f2] mb-4 mx-auto">
+            <School size={40} />
+          </div>
+          <h1 className="text-2xl font-bold mb-2">Добро пожаловать</h1>
+          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Рады приветствовать Вас! Войдите в аккаунт для синхронизации, либо войдите анонимно (позднее будет возможность войти в аккаунт в пункте "настройки").
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 md:gap-4 w-full max-w-sm">
-          <button 
-            onClick={onGoogleLogin}
-            className="flex items-center justify-center gap-3 bg-[#4285f4] hover:bg-[#357ae8] text-white py-3 md:py-4 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg"
-          >
-            <LogIn size={20} />
-            Войти через Google
-          </button>
-
-          {(currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) && (
+        {!showRoleSelection ? (
+          /* Main Login Options */
+          <div className="w-full space-y-3">
             <button 
-              onClick={onDevLogin}
-              className="flex items-center justify-center gap-3 bg-[#3ba55c] hover:bg-[#2d7d46] text-white py-3 md:py-4 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg"
+              onClick={handleAnonymousClick}
+              className={`w-full py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${isDarkMode ? 'bg-[#2b2d31] hover:bg-[#35373c] text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'}`}
             >
-              <TestTube size={20} />
-              Тестовый вход (Localhost)
+              <User size={18} />
+              Войти анонимно
             </button>
-          )}
-          
-          <button 
-            onClick={() => onSkip(dontShowAgain)}
-            className={`flex items-center justify-center gap-3 py-3 md:py-4 rounded-lg font-bold transition-all transform hover:scale-105 active:scale-95 border-2 ${isDarkMode ? 'border-[#424549] bg-[#424549] text-white' : 'border-[#e3e5e8] bg-white text-gray-700'}`}
-          >
-            <User size={20} />
-            Войти анонимно
-          </button>
-        </div>
 
-        <div className="flex items-center gap-2 mt-2 md:mt-4 cursor-pointer group select-none" onClick={() => setDontShowAgain(!dontShowAgain)}>
-          <input type="checkbox" checked={dontShowAgain} onChange={() => {}} className="w-4 h-4 rounded border-gray-300 text-[#5865f2] focus:ring-[#5865f2] cursor-pointer" />
-          <span className={`text-xs md:text-sm group-hover:underline ${isDarkMode ? 'text-[#b9bbbe]' : 'text-gray-500'}`}>Больше не показывать</span>
+            <button 
+              onClick={() => onOpenBrowser('https://school-helper.ru/#/auth')}
+              className="w-full py-3.5 rounded-xl font-bold bg-white text-gray-900 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 border border-gray-200"
+            >
+              <img src="https://www.google.com/favicon.ico" alt="G" className="w-5 h-5" />
+              <span>Войти как User</span>
+            </button>
+
+            <div className="flex items-center gap-2 justify-center mt-6 cursor-pointer group select-none" onClick={() => setDontShowAgain(!dontShowAgain)}>
+              <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${dontShowAgain ? 'bg-[#5865f2] border-[#5865f2]' : 'border-gray-500'}`}>
+                {dontShowAgain && <User size={12} className="text-white" />}
+              </div>
+              <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-500'}`}>
+                Запомнить выбор
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* Role Selection */
+          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <h3 className="text-lg font-bold mb-6">Выберите роль</h3>
+            <div className="grid grid-cols-2 gap-3 p-1 bg-[#111214] rounded-xl border border-white/5">
+              <button 
+                onClick={() => handleRoleSelect('student')}
+                className="flex items-center justify-center gap-2 py-3 rounded-lg hover:bg-[#2b2d31] transition-colors text-gray-300 hover:text-white font-medium"
+              >
+                <Backpack size={18} />
+                Я Ученик
+              </button>
+              <button 
+                onClick={() => handleRoleSelect('teacher')}
+                className="flex items-center justify-center gap-2 py-3 rounded-lg hover:bg-[#2b2d31] transition-colors text-gray-300 hover:text-white font-medium"
+              >
+                <GraduationCap size={18} />
+                Я Учитель
+              </button>
+            </div>
+            <button 
+              onClick={() => setShowRoleSelection(false)}
+              className={`mt-6 text-sm font-medium hover:underline ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}
+            >
+              Назад
+            </button>
+          </div>
+        )}
+
+        <div className={`mt-8 text-[10px] text-center max-w-xs ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+          Продолжая, вы принимаете <button onClick={() => onOpenBrowser('https://school-helper.ru/#/privacy')} className="underline hover:text-[#5865f2]">Политику конфиденциальности</button>
         </div>
       </div>
     </div>

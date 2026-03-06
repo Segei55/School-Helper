@@ -536,7 +536,8 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
             </div>
             
             <div className={`flex-1 rounded-3xl overflow-hidden relative border group shadow-inner min-h-[200px] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-gray-50 border-gray-100'}`} onMouseLeave={() => setShowCoords(false)}>
-              {/* PREMIUM LOCK OVERLAY */}
+              {/* PREMIUM LOCK OVERLAY - TEMPORARILY DISABLED */}
+              {/*
               {!isPremium && (
                   <PremiumOverlay 
                      title="Графический калькулятор" 
@@ -544,6 +545,7 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
                      onOpenModal={() => onTriggerPremium && onTriggerPremium('graphing')} 
                   />
               )}
+              */}
 
               <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onWheel={handleWheel} className="w-full h-full block" />
               

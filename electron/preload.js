@@ -12,8 +12,8 @@ contextBridge.exposeInMainWorld('electron', {
   // Listener for Deep Link Auth Data
   onAuthData: (callback) => ipcRenderer.on('auth-data', (_event, value) => callback(value)),
 
-  // Send token from renderer to main process to persist session across restarts
-  setAuthToken: (token) => ipcRenderer.send('set-auth-token', token),
+  // Send tokens (access + refresh) from renderer to main process
+  setAuthToken: (tokens) => ipcRenderer.send('set-auth-token', tokens),
   
   driveExport: (filename, content) => ipcRenderer.invoke('drive-export', filename, content),
   driveImport: (filename) => ipcRenderer.invoke('drive-import', filename),
@@ -34,5 +34,9 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.removeAllListeners('ai-chunk');
     ipcRenderer.removeAllListeners('ai-done');
     ipcRenderer.removeAllListeners('ai-error');
-  }
+  },
+
+  // Browser Control
+  setAdBlock: (enabled) => ipcRenderer.send('set-adblock', enabled),
+  onOpenInternalUrl: (callback) => ipcRenderer.on('open-internal-url', (_event, url) => callback(url))
 });

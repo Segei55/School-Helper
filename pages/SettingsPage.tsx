@@ -1,7 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { UserInfo } from '../types';
-import { LogOut, Sun, Info, ShieldCheck, LogIn, School, RotateCcw, Monitor, Power, ArrowDownToLine, Star, CreditCard, Sparkles, Crown, Key, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { LogOut, Sun, Info, ShieldCheck, LogIn, School, RotateCcw, Monitor, Power, ArrowDownToLine, Star, CreditCard, Sparkles, Crown, Key, Loader2, CheckCircle, AlertTriangle, GraduationCap, Lock, Keyboard, Command } from 'lucide-react';
+import PinScreen from '../components/PinScreen';
+import HotkeysModal from '../components/HotkeysModal';
 
 interface SettingsPageProps {
   userInfo: UserInfo | null;
@@ -17,6 +18,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [minimizeToTray, setMinimizeToTray] = useState(true);
   const [isElectron, setIsElectron] = useState(false);
+  
+  // PIN State
+  const [hasPin, setHasPin] = useState(false);
+  const [showPinModal, setShowPinModal] = useState< 'setup' | 'verify' | null >(null);
+  const [showHotkeys, setShowHotkeys] = useState(false);
 
   // License Activation State
   const [licenseInput, setLicenseInput] = useState('');
@@ -27,6 +33,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
   useEffect(() => {
     const isElectronEnv = !!window.electron;
     const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    // Check if PIN is set
+    setHasPin(!!localStorage.getItem('school_helper_pin_hash'));
     
     if (isElectronEnv || isDev) {
       setIsElectron(true);
@@ -55,6 +64,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
     }
   };
 
+  const handleTogglePin = () => {
+    if (hasPin) {
+      // If PIN is enabled, verify before disabling
+      setShowPinModal('verify');
+    } else {
+      // If PIN is disabled, setup new
+      setShowPinModal('setup');
+    }
+  };
+
+  const onPinSuccess = () => {
+    if (showPinModal === 'verify') {
+       // Was verifying to disable
+       localStorage.removeItem('school_helper_pin_hash');
+       setHasPin(false);
+    } else if (showPinModal === 'setup') {
+       // Was setting up
+       setHasPin(true);
+    }
+    setShowPinModal(null);
+  };
+
   const handleActivateLicense = async () => {
     if (!licenseInput.trim() || !userInfo?.email) return;
     setIsActivating(true);
@@ -79,7 +110,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
         const data = await response.json();
         console.log("Activation Response:", data);
 
-        // Проверяем различные варианты успешного ответа
         if (data.success || data.is_premium === true || data.is_premium === '1') {
             setActivationSuccess(true);
             if (onUpdateUser) {
@@ -100,7 +130,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
   const handleOpenSite = (e: React.MouseEvent) => {
     e.preventDefault();
     if (window.electron && window.electron.loginGoogle) {
-         window.electron.loginGoogle(); // Re-use the shell.openExternal logic from main.js usually used for auth
+         window.electron.loginGoogle(); 
     } else {
          window.open('https://school-helper.ru/#/auth', '_blank');
     }
@@ -108,7 +138,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
 
   const formatValidUntil = (dateStr?: string) => {
       if (!dateStr) return 'Бессрочно';
-      // Attempt to parse date string or timestamp
       const date = new Date(isNaN(Number(dateStr)) ? dateStr : Number(dateStr) * 1000);
       if (isNaN(date.getTime())) return dateStr;
       
@@ -144,36 +173,73 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
         .animate-star-3 { animation: float-star 3s infinite ease-in-out 1s; }
       `}</style>
       
+      {showPinModal && (
+          <PinScreen 
+             mode={showPinModal} 
+             onSuccess={onPinSuccess}
+             onCancel={() => setShowPinModal(null)}
+             isDarkMode={isDarkMode}
+          />
+      )}
+
       {/* User Profile Card */}
       <div className={`flex flex-col md:flex-row items-center gap-6 p-8 rounded-[32px] ${cardClasses}`}>
-        <div className="w-24 h-24 rounded-[24px] bg-[#5865f2] overflow-hidden flex items-center justify-center shrink-0 shadow-lg relative group">
-          {userInfo?.photoUrl ? (
-            <img src={userInfo.photoUrl} alt="Avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-          ) : (
-            <School size={48} className="text-white" />
+        <div className="relative w-24 h-24 shrink-0">
+          <div className="w-full h-full rounded-[24px] bg-[#5865f2] overflow-hidden flex items-center justify-center shadow-lg relative group">
+            {userInfo?.photoUrl ? (
+              <img src={userInfo.photoUrl} alt="Avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+            ) : (
+              <School size={48} className="text-white" />
+            )}
+          </div>
+          
+          {userInfo?.role === 'teacher' && (
+              <div className="absolute -top-3 -right-3 bg-[#5865f2] text-white p-2 rounded-full border-4 border-[#202225] shadow-lg z-20" title="Учитель">
+                  <GraduationCap size={16} />
+              </div>
           )}
+
+          {/* TEMPORARILY HIDDEN
           {userInfo?.isPremium && (
-             <div className="absolute -bottom-1 -right-1 bg-[#faa61a] rounded-full p-1.5 border-4 border-[#202225]">
-                 <Crown size={12} className="text-white fill-white" />
+             <div className="absolute -bottom-2 -right-2 bg-[#faa61a] rounded-full p-2 border-4 border-[#202225] z-20">
+                 <Crown size={14} className="text-white fill-white" />
              </div>
           )}
+          */}
         </div>
         
         <div className="flex-1 text-center md:text-left">
           <div className="flex items-center justify-center md:justify-start gap-3 mb-1">
-             <h2 className={`text-3xl font-extrabold ${headerText}`}>{userInfo?.displayName || 'Гость'}</h2>
+             <h2 className={`text-3xl font-extrabold ${headerText} flex items-center gap-3`}>
+                {userInfo?.role === 'teacher' && (
+                  <span className="text-sm bg-[#5865f2] text-white px-2 py-1 rounded-lg shadow-sm align-middle flex items-center gap-1">
+                     <GraduationCap size={12} />
+                     Учитель
+                  </span>
+                )}
+                {userInfo?.role === 'student' && (
+                  <span className="text-sm bg-[#3ba55c] text-white px-2 py-1 rounded-lg shadow-sm align-middle flex items-center gap-1">
+                     <School size={12} />
+                     Ученик
+                  </span>
+                )}
+                {userInfo?.displayName || 'Гость'}
+             </h2>
+             {/* TEMPORARILY HIDDEN
              {userInfo?.isPremium && (
                  <div className="px-3 py-1 rounded-full bg-gradient-to-r from-[#faa61a] to-[#f59e0b] flex items-center gap-1.5 shadow-lg shadow-[#faa61a]/20 animate-in zoom-in duration-300">
                     <Crown size={14} className="text-white fill-white" />
                     <span className="text-white text-[10px] font-extrabold uppercase tracking-widest">Premium</span>
                  </div>
              )}
+             */}
           </div>
           <p className={secondaryText}>{userInfo?.email || 'Автономный режим'}</p>
         </div>
       </div>
 
-      {/* Premium Subscription Section */}
+      {/* Premium Subscription Section - TEMPORARILY HIDDEN */}
+      {/* 
       <div className="relative p-[2px] rounded-[34px] bg-gradient-to-r from-[#5865f2] via-[#eb459e] to-[#faa61a] shadow-xl group/premium">
         <div className={`p-6 rounded-[32px] flex flex-col items-start gap-6 relative overflow-hidden ${isDarkMode ? 'bg-[#202225]' : 'bg-white'}`}>
           
@@ -235,7 +301,6 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
              </div>
           )}
 
-          {/* Validation Messages */}
           {activationError && (
               <div className="w-full p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold flex items-center gap-2 animate-in slide-in-from-top-2">
                   <AlertTriangle size={16} />
@@ -250,6 +315,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
           )}
         </div>
       </div>
+      */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Appearance */}
@@ -262,50 +328,91 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
             <span className="font-medium">Тёмная тема</span>
             <button 
               onClick={onToggleTheme}
-              className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 flex items-center ${isDarkMode ? 'bg-[#5865f2]' : 'bg-gray-300'}`}
+              className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex items-center ${isDarkMode ? 'bg-[#5865f2]' : 'bg-gray-300'}`}
             >
-              <div className={`w-6 h-6 bg-white rounded-full transition-transform duration-300 ${isDarkMode ? 'translate-x-6' : ''}`} />
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${isDarkMode ? 'translate-x-6' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* System Settings (Electron Only) */}
-        {isElectron && (
-          <div className={`${cardClasses} p-6 rounded-2xl space-y-4`}>
+        {/* System Settings */}
+        <div className={`${cardClasses} p-6 rounded-2xl space-y-4`}>
             <div className="flex items-center gap-2 font-bold mb-4">
                <Monitor size={20} className="text-[#3ba55c]" />
                <span>Система</span>
             </div>
             
-            <div className={`flex items-center justify-between p-4 rounded-xl mb-2 ${subCardClasses}`}>
-              <div className="flex items-center gap-3">
-                 <Power size={18} className="text-gray-500" />
-                 <span className="font-medium text-sm">Автозапуск с системой</span>
-              </div>
-              <button 
-                onClick={handleToggleAutoLaunch}
-                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex items-center ${autoLaunch ? 'bg-[#5865f2]' : 'bg-gray-400'}`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${autoLaunch ? 'translate-x-6' : ''}`} />
-              </button>
-            </div>
+            {isElectron && (
+              <>
+                <div className={`flex items-center justify-between p-4 rounded-xl mb-2 ${subCardClasses}`}>
+                  <div className="flex items-center gap-3">
+                    <Power size={18} className="text-gray-500" />
+                    <span className="font-medium text-sm">Автозапуск</span>
+                  </div>
+                  <button 
+                    onClick={handleToggleAutoLaunch}
+                    className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex items-center ${autoLaunch ? 'bg-[#5865f2]' : 'bg-gray-400'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${autoLaunch ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
 
+                <div className={`flex items-center justify-between p-4 rounded-xl mb-2 ${subCardClasses}`}>
+                  <div className="flex items-center gap-3">
+                    <ArrowDownToLine size={18} className="text-gray-500" />
+                    <span className="font-medium text-sm">Сворачивать в трей</span>
+                  </div>
+                  <button 
+                    onClick={handleToggleTray}
+                    className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex items-center ${minimizeToTray ? 'bg-[#5865f2]' : 'bg-gray-400'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${minimizeToTray ? 'translate-x-6' : ''}`} />
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* PIN Toggle */}
             <div className={`flex items-center justify-between p-4 rounded-xl ${subCardClasses}`}>
-              <div className="flex items-center gap-3">
-                 <ArrowDownToLine size={18} className="text-gray-500" />
-                 <span className="font-medium text-sm">Сворачивать в трей</span>
-              </div>
-              <button 
-                onClick={handleToggleTray}
-                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex items-center ${minimizeToTray ? 'bg-[#5865f2]' : 'bg-gray-400'}`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${minimizeToTray ? 'translate-x-6' : ''}`} />
-              </button>
+                <div className="flex items-center gap-3">
+                    <Lock size={18} className="text-gray-500" />
+                    <span className="font-medium text-sm">Вход по ПИН-коду</span>
+                </div>
+                <button 
+                    onClick={handleTogglePin}
+                    className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex items-center ${hasPin ? 'bg-[#5865f2]' : 'bg-gray-400'}`}
+                >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${hasPin ? 'translate-x-6' : ''}`} />
+                </button>
             </div>
-          </div>
-        )}
+        </div>
 
-        {/* Info */}
+        {/* Controls Settings */}
+        <div className={`${cardClasses} p-6 rounded-2xl space-y-4`}>
+            <div className="flex items-center gap-2 font-bold mb-4">
+               <Keyboard size={20} className="text-[#eb459e]" />
+               <span>Управление</span>
+            </div>
+            
+            <button 
+              onClick={() => setShowHotkeys(true)}
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${subCardClasses} hover:brightness-95 active:scale-[0.98]`}
+            >
+              <div className="flex items-center gap-3">
+                <Command size={18} className="text-gray-500" />
+                <span className="font-medium text-sm">Горячие клавиши</span>
+              </div>
+              <div className={`px-2 py-1 rounded text-xs font-bold ${isDarkMode ? 'bg-black/20 text-gray-400' : 'bg-white text-gray-500'}`}>
+                Показать
+              </div>
+            </button>
+        </div>
+      </div>
+
+      {showHotkeys && <HotkeysModal onClose={() => setShowHotkeys(false)} isDarkMode={isDarkMode} />}
+
+      {/* Info & Account */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className={`${cardClasses} p-6 rounded-2xl space-y-4`}>
           <div className="flex items-center gap-2 font-bold mb-4">
              <Info size={20} className="text-[#eb459e]" />
@@ -322,44 +429,44 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
              </div>
           </div>
         </div>
-      </div>
-
-      <div className={`${cardClasses} p-6 rounded-2xl`}>
-         <div className="flex items-center gap-2 font-bold mb-4">
-             <ShieldCheck size={20} className="text-[#5865f2]" />
-             <span>Аккаунт и безопасность</span>
-          </div>
-          <div className="flex flex-col gap-3">
-            {userInfo ? (
-              <button 
-                onClick={onLogout}
-                className="w-full flex items-center justify-center gap-2 bg-[#ed4245] hover:bg-red-600 text-white p-4 rounded-xl font-bold transition-all transform active:scale-[0.98]"
-              >
-                <LogOut size={20} />
-                Выйти из аккаунта
-              </button>
-            ) : (
-              <div className="flex flex-col gap-3">
-                 <button 
-                  onClick={onGoogleLogin}
-                  className="w-full flex items-center justify-center gap-2 bg-[#4285f4] hover:bg-[#357ae8] text-white p-4 rounded-xl font-bold transition-all transform active:scale-[0.98]"
+        
+        <div className={`${cardClasses} p-6 rounded-2xl`}>
+            <div className="flex items-center gap-2 font-bold mb-4">
+                <ShieldCheck size={20} className="text-[#5865f2]" />
+                <span>Аккаунт</span>
+            </div>
+            <div className="flex flex-col gap-3">
+                {userInfo ? (
+                <button 
+                    onClick={onLogout}
+                    className="w-full flex items-center justify-center gap-2 bg-[#ed4245] hover:bg-red-600 text-white p-4 rounded-xl font-bold transition-all transform active:scale-[0.98]"
                 >
-                  <LogIn size={20} />
-                  Войти через Google
+                    <LogOut size={20} />
+                    Выйти из аккаунта
                 </button>
-                
-                {onResetWelcome && (
-                  <button 
-                    onClick={onResetWelcome}
-                    className={`w-full flex items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all ${isDarkMode ? 'bg-[#2f3136] hover:bg-[#36393f] text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
-                  >
-                    <RotateCcw size={20} />
-                    Вернуться на стартовый экран
-                  </button>
+                ) : (
+                <div className="flex flex-col gap-3">
+                    <button 
+                    onClick={onGoogleLogin}
+                    className="w-full flex items-center justify-center gap-2 bg-[#4285f4] hover:bg-[#357ae8] text-white p-4 rounded-xl font-bold transition-all transform active:scale-[0.98]"
+                    >
+                    <LogIn size={20} />
+                    Войти через Google
+                    </button>
+                    
+                    {onResetWelcome && (
+                    <button 
+                        onClick={onResetWelcome}
+                        className={`w-full flex items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all ${isDarkMode ? 'bg-[#2f3136] hover:bg-[#36393f] text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                    >
+                        <RotateCcw size={20} />
+                        Вернуться на стартовый экран
+                    </button>
+                    )}
+                </div>
                 )}
-              </div>
-            )}
-          </div>
+            </div>
+        </div>
       </div>
     </div>
   );

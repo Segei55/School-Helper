@@ -1,5 +1,4 @@
-
-const { app, BrowserWindow, ipcMain, shell, Tray, Menu, safeStorage, net } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Tray, Menu, safeStorage, net, session } = require('electron');
 const path = require('path');
 const https = require('https');
 const querystring = require('querystring');
@@ -7,8 +6,6 @@ const fs = require('fs');
 const url = require('url');
 
 // --- LOCAL DEV CONFIG ---
-// Пытаемся загрузить ключи из .env.local только для локальной разработки
-// В продакшене (в exe/deb) этот файл не будет использоваться, так как ключ будет вшит.
 try {
     const envLocalPath = path.join(__dirname, '../.env.local');
     if (fs.existsSync(envLocalPath)) {
@@ -17,26 +14,14 @@ try {
             process.env[k] = envConfig[k];
         }
     }
-} catch (e) {
-    // Игнорируем ошибки dotenv в продакшене
-}
+} catch (e) {}
 
 // --- КОНФИГУРАЦИЯ GOOGLE CLOUD (Desktop) ---
-// Note: Drive operations still require an access token, but the login flow now relies on the website.
-
-// SECURITY: Keys are injected via build process.
 const API_KEY_FALLBACK = ""; 
 
 // SECURITY: KEY FOR AI
-// Логика выбора ключа:
-// 1. Сначала ищем в process.env (если запущено локально с .env.local)
-// 2. Если нет, ищем заглушку "REPLACE_ME_IN_CI" (которую заменит GitHub Actions при сборке)
 let OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-
-// Если мы в продакшене и ключ не был подменен (все еще заглушка), значит что-то пошло не так при сборке.
-// Но если CI/CD отработал, то "REPLACE_ME_IN_CI" будет заменена на реальный ключ строкой.
 if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'REPLACE_ME_IN_CI') {
-     // Fallback на переменную, если она была вшита через sed
      OPENROUTER_API_KEY = "REPLACE_ME_IN_CI"; 
 }
 
@@ -47,8 +32,7 @@ let isQuitting = false;
 // Хранение токенов в памяти
 let sessionTokens = {
   access_token: null,
-  refresh_token: null,
-  expiry_date: null
+  refresh_token: null
 };
 
 // Хранение настроек приложения
@@ -126,6 +110,7 @@ function handleDeepLink(urlStr) {
                             data.is_premium === 1 || 
                             data.is_premium === 'true';
 
+                         // Extract refresh_token if available (Authorization Code Flow)
                          const userData = {
                              email: data.email,
                              displayName: data.name || (data.email ? data.email.split('@')[0] : 'User'),
@@ -133,7 +118,9 @@ function handleDeepLink(urlStr) {
                              licenseKey: data.license_key,
                              isPremium: isPremium,
                              validUntil: data.premium_until,
-                             accessToken: data.access_token
+                             accessToken: data.access_token,
+                             refreshToken: data.refresh_token || null,
+                             role: data.role
                          };
 
                          if (userData.email && mainWindow) {
@@ -145,32 +132,6 @@ function handleDeepLink(urlStr) {
                      } catch (parseError) {}
                  }
              }
-        }
-        else if (parsedUrl.host === 'auth') {
-            const params = parsedUrl.searchParams;
-            const email = params.get('email');
-            const licenseKey = params.get('key');
-            const rawPremium = params.get('is_premium') || params.get('premium');
-            const isPremium = rawPremium === '1' || rawPremium === 'true';
-            const validUntil = params.get('until');
-            const photoUrl = params.get('photo_url') || params.get('photo') || params.get('picture');
-            const displayName = params.get('name') || params.get('display_name') || (email ? email.split('@')[0] : 'User');
-            const accessToken = params.get('access_token') || params.get('token');
-
-            if (email) {
-                const userData = {
-                    email, licenseKey, isPremium, validUntil,
-                    photoUrl: photoUrl || null,
-                    displayName: displayName, 
-                    accessToken: accessToken || null 
-                };
-                if (mainWindow) {
-                    mainWindow.webContents.send('auth-data', userData);
-                    if (mainWindow.isMinimized()) mainWindow.restore();
-                    if (!mainWindow.isVisible()) mainWindow.show();
-                    mainWindow.focus();
-                }
-            }
         }
     } catch (e) {}
 }
@@ -210,19 +171,16 @@ function loadTokens() {
              sessionTokens = JSON.parse(decrypted);
              return;
           } catch (e) {
-             try {
-                sessionTokens = JSON.parse(buffer.toString());
-                saveTokens({});
-                return;
-             } catch (jsonErr) {}
+             // Fallback or corrupted
           }
       }
     }
+    // Legacy migration if needed
     const LEGACY_PATH = path.join(app.getPath('userData'), 'auth_tokens.json');
     if (fs.existsSync(LEGACY_PATH)) {
         const data = fs.readFileSync(LEGACY_PATH);
         sessionTokens = JSON.parse(data);
-        saveTokens({});
+        saveTokens(sessionTokens); // Re-save encrypted
         fs.unlinkSync(LEGACY_PATH);
     }
   } catch (e) {}
@@ -235,9 +193,6 @@ function saveTokens(tokens) {
     if (safeStorage.isEncryptionAvailable()) {
         const encryptedBuffer = safeStorage.encryptString(jsonStr);
         fs.writeFileSync(TOKEN_PATH, encryptedBuffer);
-    } else {
-        const LEGACY_PATH = path.join(app.getPath('userData'), 'auth_tokens.json');
-        fs.writeFileSync(LEGACY_PATH, jsonStr);
     }
   } catch (e) {}
 }
@@ -271,7 +226,8 @@ function createWindow() {
     icon: path.join(__dirname, 'icon.png'), show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false, contextIsolation: true, sandbox: false 
+      nodeIntegration: false, contextIsolation: true, sandbox: false,
+      webviewTag: true // Enable webview for the Browser tool
     },
   });
 
@@ -288,8 +244,31 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    const safeDomains = ['https://school-helper.ru', 'https://accounts.google.com', 'https://www.google.com'];
-    if (safeDomains.some(domain => url.startsWith(domain))) shell.openExternal(url);
+    // Check for auth/registration links
+    const isAuth = url.includes('accounts.google.com') || 
+                   url.includes('oauth') || 
+                   url.includes('/auth') || 
+                   url.includes('login') || 
+                   url.includes('signin') ||
+                   url.includes('register') ||
+                   url.includes('signup');
+
+    if (isAuth) {
+        return { 
+            action: 'allow', 
+            overrideBrowserWindowOptions: { 
+                autoHideMenuBar: true,
+                alwaysOnTop: true, 
+                parent: mainWindow,
+                modal: false 
+            } 
+        };
+    }
+
+    // Open all external links in the internal browser
+    if (url.startsWith('http')) {
+        mainWindow.webContents.send('open-internal-url', url);
+    }
     return { action: 'deny' };
   });
 
@@ -297,13 +276,15 @@ function createWindow() {
     const parsedUrl = new URL(navigationUrl);
     if (parsedUrl.protocol !== 'file:' && parsedUrl.protocol !== 'schoolhelper:') {
         event.preventDefault();
-        const safeDomains = ['school-helper.ru', 'accounts.google.com'];
-        if (safeDomains.some(domain => navigationUrl.includes(domain))) shell.openExternal(navigationUrl);
+        mainWindow.webContents.send('open-internal-url', navigationUrl);
     }
   });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show(); mainWindow.focus();
+    if (!app.isPackaged) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
     if (process.platform !== 'darwin' && process.argv.length >= 2) {
        const urlStr = process.argv.find(arg => arg.startsWith('schoolhelper://'));
        if (urlStr) handleDeepLink(urlStr);
@@ -324,33 +305,77 @@ function createWindow() {
   ipcMain.on('close-window', () => { mainWindow.close(); });
 }
 
+// --- AD BLOCKER LOGIC ---
+const adDomains = [
+  // Google
+  "*://*.doubleclick.net/*", "*://*.googlesyndication.com/*", 
+  "*://*.google-analytics.com/*", "*://*.adservice.google.com/*",
+  "*://*.googleadservices.com/*", "*://*.googletagservices.com/*",
+  
+  // Yandex
+  "*://*.yandex.ru/ads/*", "*://*.an.yandex.ru/*", "*://*.mc.yandex.ru/*",
+  "*://*.bs.yandex.ru/*", "*://*.awaps.yandex.net/*",
+
+  // Common Ad Networks & Trackers
+  "*://creative.sizmek.com/*", "*://*.criteo.com/*",
+  "*://*.pubmatic.com/*", "*://*.rubiconproject.com/*",
+  "*://*.taboola.com/*", "*://*.outbrain.com/*",
+  "*://*.adroll.com/*", "*://*.smartadserver.com/*",
+  "*://*.adnxs.com/*", "*://*.advertising.com/*",
+  "*://*.casalemedia.com/*", "*://*.contextweb.com/*",
+  "*://*.openx.net/*", "*://*.zedo.com/*",
+  "*://*.adsafeprotected.com/*", "*://*.moatads.com/*",
+  "*://*.scorecardresearch.com/*", "*://*.quantserve.com/*",
+  "*://*.amazon-adsystem.com/*", "*://*.rlcdn.com/*"
+];
+
+ipcMain.on('set-adblock', (event, enabled) => {
+  // Use the default session or a specific partition if you set one on <webview>
+  // We'll target the default session for simplicity as <webview> inherits it by default if partition not set
+  const ses = session.defaultSession; 
+  if (enabled) {
+    ses.webRequest.onBeforeRequest({ urls: adDomains }, (details, callback) => {
+      callback({ cancel: true });
+    });
+    console.log("AdBlock Enabled");
+  } else {
+    ses.webRequest.onBeforeRequest({ urls: adDomains }, null); // Clear listener
+    console.log("AdBlock Disabled");
+  }
+});
+
 ipcMain.handle('get-app-settings', () => appSettings);
 ipcMain.handle('update-app-setting', (event, key, value) => {
   const newSettings = {}; newSettings[key] = value;
   saveSettings(newSettings); return appSettings;
 });
 ipcMain.handle('get-api-key', () => process.env.API_KEY || API_KEY_FALLBACK);
-ipcMain.on('set-auth-token', (event, token) => {
-  if (token === null) {
-    sessionTokens = { access_token: null, refresh_token: null, expiry_date: null };
-    try { if (fs.existsSync(TOKEN_PATH)) fs.unlinkSync(TOKEN_PATH); } catch(e) {}
-  } else {
-    sessionTokens.access_token = token;
-    saveTokens({ access_token: token }); 
+
+// UPDATED: Handle object with both tokens
+ipcMain.on('set-auth-token', (event, tokens) => {
+  if (tokens && typeof tokens === 'object') {
+      sessionTokens = { 
+          access_token: tokens.access_token || null, 
+          refresh_token: tokens.refresh_token || null 
+      };
+      saveTokens(sessionTokens);
+  } else if (tokens === null) {
+      // Logout logic
+      sessionTokens = { access_token: null, refresh_token: null };
+      try { if (fs.existsSync(TOKEN_PATH)) fs.unlinkSync(TOKEN_PATH); } catch(e) {}
   }
 });
+
 ipcMain.handle('google-login', async (event) => {
     const authUrl = "https://school-helper.ru/#/auth?mode=app";
-    if (authUrl.startsWith('https://')) await shell.openExternal(authUrl);
+    event.sender.send('open-internal-url', authUrl);
     return null;
 });
 
 // --- AI PROXY (SECURE REQUESTS) ---
 ipcMain.on('ai-request', async (event, { messages, model, systemInstruction }) => {
-    // В локальном режиме (dev) ключ берется из .env.local
-    // В продакшене (build) ключ "REPLACE_ME_IN_CI" будет заменен на реальный
     if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY.includes('REPLACE_ME')) {
-        event.sender.send('ai-error', 'API ключ не настроен. Если вы запускаете локально, создайте .env.local. Если это сборка, проверьте CI.');
+        event.sender.send('ai-error', 'API ключ не настроен.');
         return;
     }
 
@@ -382,7 +407,6 @@ ipcMain.on('ai-request', async (event, { messages, model, systemInstruction }) =
             event.sender.send('ai-error', `Ошибка сервера: ${response.statusCode}`);
             return;
         }
-
         response.on('data', (chunk) => {
             const lines = chunk.toString('utf8').split('\n');
             for (const line of lines) {
@@ -395,54 +419,102 @@ ipcMain.on('ai-request', async (event, { messages, model, systemInstruction }) =
                     try {
                         const json = JSON.parse(data);
                         const content = json.choices[0]?.delta?.content;
-                        if (content) {
-                            event.sender.send('ai-chunk', content);
-                        }
+                        if (content) event.sender.send('ai-chunk', content);
                     } catch (e) {}
                 }
             }
         });
-
-        response.on('end', () => {
-             event.sender.send('ai-done');
-        });
-        
-        response.on('error', (e) => {
-            event.sender.send('ai-error', e.message);
-        });
+        response.on('end', () => event.sender.send('ai-done'));
+        response.on('error', (e) => event.sender.send('ai-error', e.message));
     });
-
-    request.on('error', (error) => {
-        event.sender.send('ai-error', error.message);
-    });
-
+    request.on('error', (error) => event.sender.send('ai-error', error.message));
     request.write(payload);
     request.end();
 });
 
 
-// --- DRIVE OPERATIONS ---
+// --- DRIVE OPERATIONS & AUTH REFRESH ---
+
+// 1. Basic Request Wrapper
 function request(options, postData = null) {
   return new Promise((resolve, reject) => {
     const req = https.request({ ...options, timeout: 15000 }, (res) => {
-      let body = ''; res.on('data', (chunk) => body += chunk);
+      let body = ''; 
+      res.on('data', (chunk) => body += chunk);
       res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) { try { resolve(JSON.parse(body)); } catch(e) { resolve(body); } } 
-        else if (res.statusCode === 401) { const error = new Error('UNAUTHORIZED'); error.code = '401'; reject(error); }
-        else { const error = new Error(`Status: ${res.statusCode}`); error.body = body; error.code = 'API_ERROR'; reject(error); }
+        if (res.statusCode >= 200 && res.statusCode < 300) { 
+            try { resolve(JSON.parse(body)); } catch(e) { resolve(body); } 
+        } else if (res.statusCode === 401) { 
+            const error = new Error('UNAUTHORIZED'); 
+            error.code = '401'; 
+            reject(error); 
+        } else { 
+            const error = new Error(`Status: ${res.statusCode}`); 
+            error.body = body; 
+            error.code = 'API_ERROR'; 
+            reject(error); 
+        }
       });
     });
     req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
     req.on('error', (e) => { reject(e); });
-    if (postData) req.write(postData); req.end();
+    if (postData) req.write(postData); 
+    req.end();
   });
 }
 
-async function authorizedRequest(options, postData = null) {
-    if (!sessionTokens.access_token) throw new Error("Google Drive Token missing");
+// 2. Token Refresh Logic
+async function refreshAccessToken() {
+    if (!sessionTokens.refresh_token) return null;
+    
+    console.log("Attempting to refresh token...");
+    try {
+        const payload = JSON.stringify({ refresh_token: sessionTokens.refresh_token });
+        const result = await request({
+            hostname: 'school-helper.ru',
+            path: '/api.php?action=refresh_token_proxy',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        }, payload);
+
+        if (result && result.success && result.access_token) {
+            console.log("Token refreshed successfully.");
+            saveTokens({ access_token: result.access_token });
+            return result.access_token;
+        } else {
+            console.error("Token refresh failed:", result);
+            return null;
+        }
+    } catch (e) {
+        console.error("Refresh token request error:", e);
+        return null;
+    }
+}
+
+// 3. Authorized Request with Auto-Refresh
+async function authorizedRequest(options, postData = null, isRetry = false) {
+    if (!sessionTokens.access_token) throw new Error("NO_TOKEN");
+    
     if (!options.headers) options.headers = {};
     options.headers['Authorization'] = `Bearer ${sessionTokens.access_token}`;
-    return await request(options, postData);
+    
+    try {
+        return await request(options, postData);
+    } catch (e) {
+        // Intercept 401
+        if ((e.message === 'UNAUTHORIZED' || e.code === '401') && !isRetry && sessionTokens.refresh_token) {
+            const newAccessToken = await refreshAccessToken();
+            if (newAccessToken) {
+                // Retry request with new token
+                options.headers['Authorization'] = `Bearer ${newAccessToken}`;
+                return await authorizedRequest(options, postData, true);
+            }
+        }
+        throw e;
+    }
 }
 
 async function findFile(filename) {
@@ -454,7 +526,7 @@ async function findFile(filename) {
 }
 
 ipcMain.handle('drive-export', async (event, filename, content) => {
-    if (!sessionTokens.access_token) return false;
+    if (!sessionTokens.access_token) throw new Error("NO_TOKEN");
     try {
         const existingFile = await findFile(filename);
         if (existingFile) {
@@ -474,11 +546,17 @@ ipcMain.handle('drive-export', async (event, filename, content) => {
             }, multipartBody);
         }
         return true;
-    } catch (e) { return false; }
+    } catch (e) {
+        if (e.message === 'UNAUTHORIZED' || e.code === '401' || e.message === 'NO_TOKEN') {
+            throw new Error("UNAUTHORIZED");
+        }
+        console.error("Drive Export Error:", e);
+        return false;
+    }
 });
 
 ipcMain.handle('drive-import', async (event, filename) => {
-    if (!sessionTokens.access_token) return null;
+    if (!sessionTokens.access_token) throw new Error("NO_TOKEN");
     try {
         const existingFile = await findFile(filename);
         if (!existingFile) return null;
@@ -486,7 +564,44 @@ ipcMain.handle('drive-import', async (event, filename) => {
             hostname: 'www.googleapis.com', path: `/drive/v3/files/${existingFile.id}?alt=media`, method: 'GET'
         });
         return typeof content === 'object' ? JSON.stringify(content) : content;
-    } catch (e) { return null; }
+    } catch (e) {
+        if (e.message === 'UNAUTHORIZED' || e.code === '401' || e.message === 'NO_TOKEN') {
+             throw new Error("UNAUTHORIZED");
+        }
+        console.error("Drive Import Error:", e);
+        return null; 
+    }
+});
+
+app.on('web-contents-created', (event, contents) => {
+    if (contents.getType() === 'webview') {
+        contents.setWindowOpenHandler(({ url }) => {
+            // Check for auth/registration links
+            const isAuth = url.includes('accounts.google.com') || 
+                           url.includes('oauth') || 
+                           url.includes('/auth') || 
+                           url.includes('login') || 
+                           url.includes('signin') ||
+                           url.includes('register') ||
+                           url.includes('signup');
+
+            if (isAuth) {
+                return { 
+                    action: 'allow', 
+                    overrideBrowserWindowOptions: { 
+                        autoHideMenuBar: true,
+                        alwaysOnTop: true,
+                        modal: false 
+                    } 
+                };
+            }
+
+            if (mainWindow) {
+                mainWindow.webContents.send('open-internal-url', url);
+            }
+            return { action: 'deny' };
+        });
+    }
 });
 
 app.whenReady().then(() => { loadTokens(); loadSettings(); createTray(); createWindow(); });
