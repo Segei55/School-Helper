@@ -100,9 +100,6 @@
         "schemes": [
           "school-helper"
         ]
-      },
-      "extraEnvironmentVariables": {
-        "OPENROUTER_API_KEY": "REPLACE_ME_IN_CI"
       }
     }
   }
