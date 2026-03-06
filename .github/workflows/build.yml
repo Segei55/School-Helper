@@ -50,9 +50,9 @@ jobs:
         with:
           name: school-helper-linux
           path: |
-            dist_electron/School-Helper.AppImage
-            dist_electron/School-Helper.deb
-            dist_electron/School-Helper.tar.gz
+            dist_electron/*.AppImage
+            dist_electron/*.deb
+            dist_electron/*.tar.gz
 
   build-win:
     runs-on: windows-latest
@@ -85,5 +85,4 @@ jobs:
         with:
           name: school-helper-windows
           path: |
-            dist_electron/School-Helper-Installer-Setup.exe
-            dist_electron/School-Helper-Portable.exe
+            dist_electron/*.exe

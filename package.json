@@ -1,6 +1,6 @@
 {
   "name": "school-helper-desktop",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A comprehensive student productivity suite",
   "author": {
     "name": "Sihmer",
@@ -69,14 +69,8 @@
     ],
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "artifactName": "School-Helper-Installer-Setup.${ext}"
-        },
-        {
-          "target": "portable",
-          "artifactName": "School-Helper-Portable.${ext}"
-        }
+        "nsis",
+        "portable"
       ],
       "icon": "electron/icon.png",
       "publish": null
@@ -94,18 +88,9 @@
     },
     "linux": {
       "target": [
-        {
-          "target": "AppImage",
-          "artifactName": "School-Helper.${ext}"
-        },
-        {
-          "target": "deb",
-          "artifactName": "School-Helper.${ext}"
-        },
-        {
-          "target": "tar.gz",
-          "artifactName": "School-Helper.${ext}"
-        }
+        "AppImage",
+        "deb",
+        "tar.gz"
       ],
       "category": "Education",
       "icon": "electron/icon.png",
