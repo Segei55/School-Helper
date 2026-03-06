@@ -27,8 +27,7 @@ jobs:
       - name: Install Linux Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ruby ruby-dev rubygems build-essential libarchive-tools
-          sudo gem install --no-document fpm
+          sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2
 
       - name: Install Project Dependencies
         run: npm install
@@ -44,17 +43,17 @@ jobs:
         env:
           API_KEY: ${{ secrets.API_KEY }}
 
-      - name: Build Electron App (deb & tar.gz)
-        run: npx electron-builder --linux deb tar.gz
+      - name: Build Electron App (AppImage, deb, tar.gz)
+        run: npx electron-builder --linux AppImage deb tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          USE_SYSTEM_FPM: true
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: school-helper-linux
           path: |
+            dist_electron/*.AppImage
             dist_electron/*.deb
             dist_electron/*.tar.gz
 
@@ -76,9 +75,9 @@ jobs:
         shell: pwsh
         run: |
           $path = "electron/main.js"
-          $content = Get-Content $path
+          $content = Get-Content $path -Raw
           $newContent = $content -replace "REPLACE_ME_IN_CI", "${{ secrets.OPENROUTER_API_KEY }}"
-          Set-Content $path $newContent
+          Set-Content $path $newContent -NoNewline
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
@@ -87,8 +86,8 @@ jobs:
         env:
           API_KEY: ${{ secrets.API_KEY }}
 
-      - name: Build Electron App (exe)
-        run: npx electron-builder --win nsis
+      - name: Build Electron App (exe - nsis and portable)
+        run: npx electron-builder --win nsis portable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -96,4 +95,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: school-helper-windows
-          path: dist_electron/*.exe
+          path: |
+            dist_electron/*.exe
