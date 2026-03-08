@@ -106,7 +106,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Setup Java
         uses: actions/setup-java@v3
@@ -136,37 +136,3 @@ jobs:
         with:
           name: school-helper-android
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
-  build-ios:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Project Dependencies
-        run: npm install
-
-      - name: Build Web Application
-        run: npm run build
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-
-      - name: Sync Capacitor
-        run: npx cap sync ios
-
-      - name: Build iOS App
-        run: |
-          cd ios/App
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -derivedDataPath build
-
-      - name: Upload iOS Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: school-helper-ios
-          path: ios/App/build/Build/Products/Debug-iphonesimulator/App.app
