@@ -125,7 +125,7 @@ const LayerManager: React.FC<LayerManagerProps> = ({
             </div>
 
             {/* Reorder & Delete (Right) */}
-            <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className={`flex flex-col gap-1 transition-opacity ${activeLayerId === layer.id ? 'opacity-100' : 'opacity-0 md:group-hover:opacity-100'}`}>
                <div className="flex gap-1">
                 <button 
                   disabled={index === 0} 

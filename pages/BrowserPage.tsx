@@ -181,8 +181,8 @@ const BrowserPage: React.FC<BrowserPageProps> = ({ isDarkMode = true, isLoggedIn
 
   // Apply AdBlock on mount/settings change
   useEffect(() => {
-      if (settings.adBlockEnabled && window.electron?.setAdBlock) {
-          window.electron.setAdBlock(true);
+      if (window.electron?.setAdBlock) {
+          window.electron.setAdBlock(settings.adBlockEnabled);
       }
   }, [settings.adBlockEnabled]);
 
@@ -308,39 +308,74 @@ const BrowserPage: React.FC<BrowserPageProps> = ({ isDarkMode = true, isLoggedIn
 
   // --- Electron Webview Events ---
   const handleWebviewRef = (id: string) => (el: any) => {
-    if (el && !webviewRefs.current[id]) {
-        webviewRefs.current[id] = el;
-        
-        el.addEventListener('did-start-loading', () => {
-            setTabs(prev => prev.map(t => t.id === id ? { ...t, isLoading: true } : t));
-        });
+    if (el) {
+        if (!webviewRefs.current[id]) {
+            webviewRefs.current[id] = el;
+            
+            el.addEventListener('did-start-loading', () => {
+                setTabs(prev => prev.map(t => t.id === id ? { ...t, isLoading: true } : t));
+            });
 
-        el.addEventListener('did-stop-loading', () => {
-            setTabs(prev => prev.map(t => t.id === id ? { 
-                ...t, 
-                isLoading: false,
-                canGoBack: el.canGoBack(),
-                canGoForward: el.canGoForward(),
-                title: el.getTitle(),
-                url: el.getURL()
-            } : t));
-            if (id === activeTabId) setUrlInput(el.getURL());
-            addToHistory(el.getURL(), el.getTitle());
-        });
+            el.addEventListener('did-stop-loading', () => {
+                setTabs(prev => prev.map(t => t.id === id ? { 
+                    ...t, 
+                    isLoading: false,
+                    canGoBack: el.canGoBack(),
+                    canGoForward: el.canGoForward(),
+                    title: el.getTitle(),
+                    url: el.getURL()
+                } : t));
+                if (id === activeTabId) setUrlInput(el.getURL());
+                addToHistory(el.getURL(), el.getTitle());
+            });
 
-        el.addEventListener('new-window', (e: any) => {
-            // Open in new tab inside app instead of external
-            const newId = Date.now().toString();
-            setTabs(prev => [...prev, { 
-                id: newId, 
-                url: e.url, 
-                title: 'Загрузка...', 
-                isLoading: true, 
-                canGoBack: false, 
-                canGoForward: false 
-            }]);
-            setActiveTabId(newId);
-        });
+            el.addEventListener('did-navigate', () => {
+                setTabs(prev => prev.map(t => t.id === id ? { 
+                    ...t, 
+                    canGoBack: el.canGoBack(),
+                    canGoForward: el.canGoForward(),
+                    title: el.getTitle(),
+                    url: el.getURL()
+                } : t));
+                if (id === activeTabId) setUrlInput(el.getURL());
+                addToHistory(el.getURL(), el.getTitle());
+            });
+
+            el.addEventListener('did-navigate-in-page', () => {
+                setTabs(prev => prev.map(t => t.id === id ? { 
+                    ...t, 
+                    canGoBack: el.canGoBack(),
+                    canGoForward: el.canGoForward(),
+                    title: el.getTitle(),
+                    url: el.getURL()
+                } : t));
+                if (id === activeTabId) setUrlInput(el.getURL());
+                addToHistory(el.getURL(), el.getTitle());
+            });
+
+            el.addEventListener('page-title-updated', (e: any) => {
+                setTabs(prev => prev.map(t => t.id === id ? { 
+                    ...t, 
+                    title: e.title || el.getTitle()
+                } : t));
+            });
+
+            el.addEventListener('new-window', (e: any) => {
+                // Open in new tab inside app instead of external
+                const newId = Date.now().toString();
+                setTabs(prev => [...prev, { 
+                    id: newId, 
+                    url: e.url, 
+                    title: 'Загрузка...', 
+                    isLoading: true, 
+                    canGoBack: false, 
+                    canGoForward: false 
+                }]);
+                setActiveTabId(newId);
+            });
+        }
+    } else {
+        delete webviewRefs.current[id];
     }
   };
 
@@ -481,33 +516,33 @@ const BrowserPage: React.FC<BrowserPageProps> = ({ isDarkMode = true, isLoggedIn
          {/* Navigation Bar */}
          <div className={`flex items-center gap-2 p-2 rounded-xl mb-2 ${isDarkMode ? 'bg-[#2f3136]' : 'bg-white shadow-sm'}`}>
             <button onClick={goBack} disabled={!tabs.find(t=>t.id===activeTabId)?.canGoBack} className="p-2 rounded-lg hover:bg-black/10 disabled:opacity-30"><ArrowLeft size={18} /></button>
-            <button onClick={goForward} disabled={!tabs.find(t=>t.id===activeTabId)?.canGoForward} className="p-2 rounded-lg hover:bg-black/10 disabled:opacity-30"><ArrowRight size={18} /></button>
+            <button onClick={goForward} disabled={!tabs.find(t=>t.id===activeTabId)?.canGoForward} className="p-2 rounded-lg hover:bg-black/10 disabled:opacity-30 hidden sm:block"><ArrowRight size={18} /></button>
             <button onClick={reload} className="p-2 rounded-lg hover:bg-black/10"><RotateCw size={18} /></button>
-            <button onClick={goHome} className="p-2 rounded-lg hover:bg-black/10"><Home size={18} /></button>
+            <button onClick={goHome} className="p-2 rounded-lg hover:bg-black/10 hidden sm:block"><Home size={18} /></button>
 
             {/* URL Input */}
-            <div className={`flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg border focus-within:ring-2 focus-within:ring-blue-500/50 transition-all ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
-                {settings.homePage.includes('ya.ru') && <span className="text-red-500 font-bold">Y</span>}
+            <div className={`flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg border focus-within:ring-2 focus-within:ring-blue-500/50 transition-all min-w-0 ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+                {settings.homePage.includes('ya.ru') && <span className="text-red-500 font-bold shrink-0">Y</span>}
                 <input 
-                    className="flex-1 bg-transparent border-none outline-none text-sm font-medium"
+                    className="flex-1 bg-transparent border-none outline-none text-sm font-medium min-w-0"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     onKeyDown={handleInputKeyDown}
                     onFocus={(e) => e.target.select()}
-                    placeholder="Введите URL или запрос..."
+                    placeholder="Введите URL..."
                 />
             </div>
 
             {/* Menu Actions */}
             <button 
                 onClick={toggleAdBlock} 
-                className={`p-2 rounded-lg transition-colors ${settings.adBlockEnabled ? 'text-blue-500 bg-blue-500/10' : 'text-gray-400'}`}
+                className={`p-2 rounded-lg transition-colors hidden sm:block ${settings.adBlockEnabled ? 'text-blue-500 bg-blue-500/10' : 'text-gray-400'}`}
                 title={settings.adBlockEnabled ? "Реклама блокируется" : "Блокировщик выключен"}
             >
                 {settings.adBlockEnabled ? <Shield size={18} /> : <ShieldAlert size={18} />}
             </button>
             
-            <button onClick={() => setShowHistory(true)} className="p-2 rounded-lg hover:bg-black/10"><History size={18} /></button>
+            <button onClick={() => setShowHistory(true)} className="p-2 rounded-lg hover:bg-black/10 hidden sm:block"><History size={18} /></button>
             <button onClick={() => setShowSettings(true)} className="p-2 rounded-lg hover:bg-black/10"><Settings size={18} /></button>
          </div>
       </div>

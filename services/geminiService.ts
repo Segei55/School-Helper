@@ -74,16 +74,24 @@ export const streamMessageFromGemini = async (
       return {
           [Symbol.asyncIterator]: async function* () {
               while (true) {
-                  if (error) throw error;
                   if (pushQueue.length > 0) {
                       const result = pushQueue.shift();
-                      if (result.done) return;
+                      if (result.done) {
+                          if (error) throw error;
+                          return;
+                      }
                       yield result.value;
                   } else {
-                      if (isDone) return;
+                      if (isDone) {
+                          if (error) throw error;
+                          return;
+                      }
                       // Ждем следующего чанка
                       const result: any = await new Promise(resolve => resolveQueue.push(resolve));
-                      if (result.done) return;
+                      if (result.done) {
+                          if (error) throw error;
+                          return;
+                      }
                       yield result.value;
                   }
               }
@@ -92,9 +100,12 @@ export const streamMessageFromGemini = async (
   }
 
   // 2. WEB MODE (Direct OpenRouter Call)
-  const DEFAULT_API_KEY = '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';
-  const API_KEY = apiKey || DEFAULT_API_KEY;
+  const API_KEY = apiKey || process.env.OPENROUTER_API_KEY || '';
   
+  if (!API_KEY) {
+      throw new Error("API ключ не настроен. Пожалуйста, добавьте его в настройки или переменные окружения.");
+  }
+
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",

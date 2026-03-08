@@ -77,8 +77,11 @@ const captureLog = (level: LogEntry['level'], args: any[]) => {
   if (GLOBAL_LOGS.length >= 1000) GLOBAL_LOGS.shift();
   GLOBAL_LOGS.push(entry);
   
-  // Уведомляем подписчиков
-  listeners.forEach(l => l());
+  // Уведомляем подписчиков асинхронно, чтобы избежать ошибки "Cannot update a component while rendering a different component"
+  // если console.log вызван во время рендера
+  setTimeout(() => {
+    listeners.forEach(l => l());
+  }, 0);
   
   // Вызываем оригинальный метод, чтобы не ломать DX
   originalConsole[level](...args);

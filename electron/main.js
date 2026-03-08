@@ -26,6 +26,7 @@ if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'REPLACE_ME_IN_CI') {
 }
 
 let mainWindow;
+let authWindow = null;
 let tray = null;
 let isQuitting = false;
 
@@ -128,6 +129,11 @@ function handleDeepLink(urlStr) {
                              if (mainWindow.isMinimized()) mainWindow.restore();
                              if (!mainWindow.isVisible()) mainWindow.show();
                              mainWindow.focus();
+                             
+                             if (authWindow && !authWindow.isDestroyed()) {
+                                 authWindow.close();
+                                 authWindow = null;
+                             }
                          }
                      } catch (parseError) {}
                  }
@@ -258,8 +264,6 @@ function createWindow() {
             action: 'allow', 
             overrideBrowserWindowOptions: { 
                 autoHideMenuBar: true,
-                alwaysOnTop: true, 
-                parent: mainWindow,
                 modal: false 
             } 
         };
@@ -311,10 +315,16 @@ const adDomains = [
   "*://*.doubleclick.net/*", "*://*.googlesyndication.com/*", 
   "*://*.google-analytics.com/*", "*://*.adservice.google.com/*",
   "*://*.googleadservices.com/*", "*://*.googletagservices.com/*",
+  "*://*.googleusercontent.com/ads/*",
   
   // Yandex
   "*://*.yandex.ru/ads/*", "*://*.an.yandex.ru/*", "*://*.mc.yandex.ru/*",
-  "*://*.bs.yandex.ru/*", "*://*.awaps.yandex.net/*",
+  "*://*.bs.yandex.ru/*", "*://*.awaps.yandex.net/*", "*://*.yandex.net/ads/*",
+  "*://*.yandex.ru/internet/*", "*://*.yandex.ru/clck/*",
+
+  // VK / Mail.ru
+  "*://*.vk.com/ads/*", "*://*.my.com/ads/*", "*://*.mail.ru/ads/*",
+  "*://*.ad.mail.ru/*", "*://*.rs.mail.ru/*",
 
   // Common Ad Networks & Trackers
   "*://creative.sizmek.com/*", "*://*.criteo.com/*",
@@ -326,20 +336,35 @@ const adDomains = [
   "*://*.openx.net/*", "*://*.zedo.com/*",
   "*://*.adsafeprotected.com/*", "*://*.moatads.com/*",
   "*://*.scorecardresearch.com/*", "*://*.quantserve.com/*",
-  "*://*.amazon-adsystem.com/*", "*://*.rlcdn.com/*"
+  "*://*.amazon-adsystem.com/*", "*://*.rlcdn.com/*",
+  "*://*.adtech.de/*", "*://*.adtechus.com/*",
+  "*://*.yieldmanager.com/*", "*://*.yieldmanager.net/*",
+  "*://*.serving-sys.com/*", "*://*.adbrite.com/*",
+  "*://*.adform.net/*", "*://*.adition.com/*",
+  "*://*.adzerk.net/*", "*://*.bidswitch.net/*",
+  "*://*.bluekai.com/*", "*://*.chartbeat.com/*",
+  "*://*.demdex.net/*", "*://*.exelator.com/*",
+  "*://*.imrworldwide.com/*", "*://*.krxd.net/*",
+  "*://*.mathtag.com/*", "*://*.mookie1.com/*",
+  "*://*.rfihub.com/*", "*://*.sharethis.com/*",
+  "*://*.tynt.com/*", "*://*.addthis.com/*",
+  "*://*.youtube.com/pagead/*", "*://*.youtube.com/api/stats/ads*",
+  "*://*.youtube.com/ptracking*", "*://*.youtube.com/api/stats/qoe*"
 ];
 
+let isAdBlockEnabled = false;
+
 ipcMain.on('set-adblock', (event, enabled) => {
-  // Use the default session or a specific partition if you set one on <webview>
-  // We'll target the default session for simplicity as <webview> inherits it by default if partition not set
   const ses = session.defaultSession; 
-  if (enabled) {
+  if (enabled && !isAdBlockEnabled) {
     ses.webRequest.onBeforeRequest({ urls: adDomains }, (details, callback) => {
       callback({ cancel: true });
     });
+    isAdBlockEnabled = true;
     console.log("AdBlock Enabled");
-  } else {
-    ses.webRequest.onBeforeRequest({ urls: adDomains }, null); // Clear listener
+  } else if (!enabled && isAdBlockEnabled) {
+    ses.webRequest.onBeforeRequest(null); // Clear listener
+    isAdBlockEnabled = false;
     console.log("AdBlock Disabled");
   }
 });
@@ -368,7 +393,27 @@ ipcMain.on('set-auth-token', (event, tokens) => {
 
 ipcMain.handle('google-login', async (event) => {
     const authUrl = "https://school-helper.ru/#/auth?mode=app";
-    event.sender.send('open-internal-url', authUrl);
+    if (authWindow && !authWindow.isDestroyed()) {
+        authWindow.focus();
+        return null;
+    }
+    
+    authWindow = new BrowserWindow({
+        width: 600,
+        height: 700,
+        autoHideMenuBar: true,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+    
+    authWindow.loadURL(authUrl);
+    
+    authWindow.on('closed', () => {
+        authWindow = null;
+    });
+    
     return null;
 });
 
@@ -590,7 +635,6 @@ app.on('web-contents-created', (event, contents) => {
                     action: 'allow', 
                     overrideBrowserWindowOptions: { 
                         autoHideMenuBar: true,
-                        alwaysOnTop: true,
                         modal: false 
                     } 
                 };

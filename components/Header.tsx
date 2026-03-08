@@ -1,12 +1,13 @@
 import React from 'react';
-import { Minus, Square, X } from 'lucide-react';
+import { Minus, Square, X, Menu } from 'lucide-react';
 
 interface HeaderProps {
   activeLabel: string;
   isDarkMode: boolean;
+  onOpenSidebar?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ activeLabel, isDarkMode }) => {
+const Header: React.FC<HeaderProps> = ({ activeLabel, isDarkMode, onOpenSidebar }) => {
   
   const handleMinimize = () => {
     if (window.electron) {
@@ -32,7 +33,16 @@ const Header: React.FC<HeaderProps> = ({ activeLabel, isDarkMode }) => {
   return (
     <header className={`h-12 flex items-center justify-between px-4 border-b shrink-0 select-none transition-colors duration-300 ${isDarkMode ? 'bg-[#202225] border-[#202225] text-white' : 'bg-white border-[#e3e5e8] text-gray-800'} app-drag-region`}>
       <div className="flex items-center gap-2 min-w-0 flex-1 mr-4 opacity-0 animate-in fade-in duration-500 slide-in-from-left-5">
-        <span className="text-[#8e9297] font-bold text-xl opacity-50 shrink-0">#</span>
+        {onOpenSidebar && (
+          <button 
+            onClick={onOpenSidebar}
+            className={`md:hidden p-1.5 -ml-2 rounded-md transition-colors no-drag ${isDarkMode ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
+            aria-label="Открыть меню"
+          >
+            <Menu size={20} />
+          </button>
+        )}
+        <span className="text-[#8e9297] font-bold text-xl opacity-50 shrink-0 hidden md:inline">#</span>
         <h1 className="font-bold text-base truncate tracking-tight">{activeLabel}</h1>
       </div>
 

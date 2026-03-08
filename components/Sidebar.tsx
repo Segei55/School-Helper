@@ -13,6 +13,8 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   sidebarMode: 'main' | 'teacher';
   onBackToMain: () => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -23,20 +25,40 @@ const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed, 
   onToggleCollapse,
   sidebarMode,
-  onBackToMain
+  onBackToMain,
+  isMobileOpen = false,
+  onCloseMobile
 }) => {
   const isSettingsActive = activeId === SectionId.Settings;
   const currentSections = sidebarMode === 'main' ? SECTIONS : TEACHER_SECTIONS;
 
   return (
-    <div className={`flex h-full transition-all duration-300 ease-in-out border-r ${isCollapsed ? 'w-[72px]' : 'w-[260px]'} ${isDarkMode ? 'bg-[#2f3136] border-[#202225]' : 'bg-[#f2f3f5] border-[#e3e5e8]'}`}>
+    <>
+      {/* Mobile Overlay */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden animate-in fade-in duration-200"
+          onClick={onCloseMobile}
+        />
+      )}
+      
+      {/* Sidebar Container */}
+      <div className={`
+        fixed md:relative z-50 h-full transition-all duration-300 ease-in-out border-r
+        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${isCollapsed ? 'w-[72px]' : 'w-[260px]'} 
+        ${isDarkMode ? 'bg-[#2f3136] border-[#202225]' : 'bg-[#f2f3f5] border-[#e3e5e8]'}
+      `}>
       
       {/* Sidebar Content Wrapper */}
       <div className="flex flex-col w-full h-full overflow-hidden">
         
         {/* TOP: Avatar & Branding Row (Whole area is clickable) */}
         <div 
-          onClick={() => onSelect(SectionId.Settings)}
+          onClick={() => {
+            onSelect(SectionId.Settings);
+            if (onCloseMobile) onCloseMobile();
+          }}
           className="flex items-center px-3 py-3 shrink-0 h-[72px] cursor-pointer group/header relative"
         >
           <div 
@@ -80,7 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               e.stopPropagation();
               onToggleCollapse();
             }}
-            className={`w-full group flex items-center rounded-md transition-all duration-200 h-10 px-3 mb-1 shrink-0
+            className={`flex w-full group items-center rounded-md transition-all duration-200 h-10 px-3 mb-1 shrink-0
               ${isDarkMode ? 'text-[#8e9297] hover:bg-[#35383c] hover:text-[#dcddde]' : 'text-gray-500 hover:bg-[#e9ecef] hover:text-gray-900'}
             `}
             title={isCollapsed ? "Развернуть" : "Свернуть"}
@@ -94,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           {/* Second Divider (Subtler, between menu toggle and tools) */}
-          <div className="px-2 py-2 shrink-0">
+          <div className="block px-2 py-2 shrink-0">
             <div className={`h-[1px] rounded-full w-full opacity-60 ${isDarkMode ? 'bg-[#36393f]' : 'bg-[#d4d7dc]'}`} />
           </div>
 
@@ -140,7 +162,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             return (
               <React.Fragment key={section.id}>
                 <button
-                  onClick={() => onSelect(section.id)}
+                  onClick={() => {
+                    onSelect(section.id);
+                    if (onCloseMobile) onCloseMobile();
+                  }}
                   className={`w-full group flex items-center rounded-md transition-all duration-200 relative overflow-hidden h-10 px-3 shrink-0
                     ${isActive 
                       ? '' 
@@ -182,6 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 

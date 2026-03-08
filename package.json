@@ -1,6 +1,6 @@
 {
   "name": "school-helper-desktop",
-  "version": "0.1.2",
+  "version": "0.1.0",
   "description": "A comprehensive student productivity suite",
   "author": {
     "name": "Sihmer",
@@ -23,6 +23,12 @@
     "build:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/ios": "^8.2.0",
+    "@capacitor/local-notifications": "^8.0.2",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -56,12 +62,20 @@
   },
   "build": {
     "appId": "com.schoolhelper.app",
-    "productName": "School-Helper",
+    "productName": "School Helper",
     "directories": {
       "output": "dist_electron",
       "buildResources": "electron"
     },
-    "icon": "electron/icon.png",
+    "icon": "icon.png",
+    "protocols": [
+      {
+        "name": "school-helper-auth",
+        "schemes": [
+          "school-helper"
+        ]
+      }
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -72,7 +86,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "electron/icon.png",
+      "icon": "icon.png",
       "publish": null
     },
     "nsis": {
@@ -84,23 +98,18 @@
     },
     "mac": {
       "target": "dmg",
-      "icon": "electron/icon.png"
+      "icon": "icon.png"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb",
+        "snap",
         "tar.gz"
       ],
       "category": "Education",
-      "icon": "electron/icon.png",
-      "maintainer": "Sihmer <support@school-helper.app>",
-      "protocols": {
-        "name": "school-helper-auth",
-        "schemes": [
-          "school-helper"
-        ]
-      }
+      "icon": "icon.png",
+      "maintainer": "Sihmer <support@school-helper.app>"
     }
   }
 }

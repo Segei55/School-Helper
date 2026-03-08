@@ -489,7 +489,7 @@ const AIPage: React.FC<AIPageProps> = ({
          </button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto pr-2 custom-scrollbar scroll-smooth px-4 py-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth px-4 py-4">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-100 select-none text-center animate-in zoom-in-95 duration-500">
              <div className="relative">

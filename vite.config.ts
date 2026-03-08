@@ -23,9 +23,8 @@ export default defineConfig(({ mode }) => {
       }
     },
     define: {
-      // Оставляем только публичные ключи (Google Maps/Auth - они публичные по дизайну)
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
-      // УДАЛЕНО: OPENROUTER_API_KEY больше не передается в браузерную часть!
+      'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY || ''),
     }
   }
 })

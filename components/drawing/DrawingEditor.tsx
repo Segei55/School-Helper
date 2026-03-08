@@ -4,7 +4,7 @@ import { drawGrid } from './GridRenderer';
 import LayerManager from './LayerManager';
 import DrawingToolbar from './DrawingToolbar';
 import { floodFill } from './FloodFill';
-import { ArrowLeft, Save, Download, Maximize, Minimize, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, Download, Maximize, Minimize, CheckCircle, Layers } from 'lucide-react';
 
 interface DrawingEditorProps {
   project: DrawingProject;
@@ -38,6 +38,11 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   const [exportName, setExportName] = useState(project.name);
   const [exportFormat, setExportFormat] = useState<'png' | 'jpeg'>('png');
   
+  // Layers Panel State
+  const [isLayersVisible, setIsLayersVisible] = useState(true);
+  const [layersWidth, setLayersWidth] = useState(288); // 72 * 4 = 288px
+  const isResizingLayers = useRef(false);
+  
   // History
   const [history, setHistory] = useState<{ layers: DrawingLayer[], backgroundColor: string }[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -53,6 +58,74 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   const lastPos = useRef<{x: number, y: number} | null>(null);
   const lastPanPos = useRef<{x: number, y: number} | null>(null);
   const hasUnsavedChanges = useRef(false);
+  
+  // Swipe Handlers
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  // Two-finger Pan/Zoom
+  const initialTouchDistance = useRef<number | null>(null);
+  const initialTouchCenter = useRef<{x: number, y: number} | null>(null);
+  const initialZoom = useRef<number>(1);
+  const initialPan = useRef<{x: number, y: number}>({x: 0, y: 0});
+
+  const handleTouchStartGlobal = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEndGlobal = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    
+    const diffX = touchEndX - touchStartX.current;
+    const diffY = touchEndY - touchStartY.current;
+
+    // Only trigger if horizontal swipe is more prominent than vertical
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      // Swipe left from the right edge to open layers
+      if (diffX < -50 && touchStartX.current > window.innerWidth - 50 && !isLayersVisible) {
+        setIsLayersVisible(true);
+      }
+      // Swipe right on the layers panel to close it
+      else if (diffX > 50 && isLayersVisible && touchStartX.current > window.innerWidth - layersWidth) {
+        setIsLayersVisible(false);
+      }
+    }
+    
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    isResizingLayers.current = true;
+  };
+
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent | TouchEvent) => {
+      if (!isResizingLayers.current) return;
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const newWidth = window.innerWidth - clientX;
+      setLayersWidth(Math.max(260, Math.min(newWidth, window.innerWidth - 100)));
+    };
+
+    const handleResizeEnd = () => {
+      isResizingLayers.current = false;
+    };
+
+    window.addEventListener('mousemove', handleResizeMove);
+    window.addEventListener('mouseup', handleResizeEnd);
+    window.addEventListener('touchmove', handleResizeMove);
+    window.addEventListener('touchend', handleResizeEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleResizeMove);
+      window.removeEventListener('mouseup', handleResizeEnd);
+      window.removeEventListener('touchmove', handleResizeMove);
+      window.removeEventListener('touchend', handleResizeEnd);
+    };
+  }, []);
 
   // --- Pointer Lock Listener ---
   useEffect(() => {
@@ -139,37 +212,7 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
     }
   }, []);
 
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      const prevState = history[historyIndex - 1];
-      setLayers(prevState.layers);
-      setBackgroundColor(prevState.backgroundColor);
-      setHistoryIndex(historyIndex - 1);
-      restoreCanvasState(prevState.layers);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const nextState = history[historyIndex + 1];
-      setLayers(nextState.layers);
-      setBackgroundColor(nextState.backgroundColor);
-      setHistoryIndex(historyIndex + 1);
-      restoreCanvasState(nextState.layers);
-    }
-  };
-  
-  const handleBackgroundColorChange = (newColor: string) => {
-    setBackgroundColor(newColor);
-    
-    if (bgTimeoutRef.current) clearTimeout(bgTimeoutRef.current);
-    
-    bgTimeoutRef.current = setTimeout(() => {
-        saveHistory(layers, newColor);
-    }, 500);
-  };
-
-  const restoreCanvasState = (state: DrawingLayer[]) => {
+  const restoreCanvasState = useCallback((state: DrawingLayer[]) => {
     state.forEach(layer => {
       const canvas = canvasRefs.current.get(layer.id);
       if (canvas) {
@@ -184,6 +227,61 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
         }
       }
     });
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const prevState = history[historyIndex - 1];
+      setLayers(prevState.layers);
+      setBackgroundColor(prevState.backgroundColor);
+      setHistoryIndex(historyIndex - 1);
+      restoreCanvasState(prevState.layers);
+    }
+  }, [history, historyIndex, restoreCanvasState]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const nextState = history[historyIndex + 1];
+      setLayers(nextState.layers);
+      setBackgroundColor(nextState.backgroundColor);
+      setHistoryIndex(historyIndex + 1);
+      restoreCanvasState(nextState.layers);
+    }
+  }, [history, historyIndex, restoreCanvasState]);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if any input is focused to avoid triggering when typing
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
+  
+  const handleBackgroundColorChange = (newColor: string) => {
+    setBackgroundColor(newColor);
+    
+    if (bgTimeoutRef.current) clearTimeout(bgTimeoutRef.current);
+    
+    bgTimeoutRef.current = setTimeout(() => {
+        saveHistory(layers, newColor);
+    }, 500);
   };
 
   const [cursorPos, setCursorPos] = useState<{x: number, y: number} | null>(null);
@@ -242,6 +340,21 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     // Prevent drawing with right click
     if ('button' in e && e.button === 2) return;
+
+    if ('touches' in e && e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      initialTouchDistance.current = dist;
+      initialTouchCenter.current = {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
+      };
+      initialZoom.current = zoom;
+      initialPan.current = { ...pan };
+      isDrawing.current = false;
+      return;
+    }
 
     const layer = layers.find(l => l.id === activeLayerId);
     if (!layer || !layer.visible || layer.locked) return;
@@ -314,6 +427,31 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if ('touches' in e && e.touches.length === 2) {
+      if (initialTouchDistance.current === null || initialTouchCenter.current === null) return;
+      
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      const center = {
+        x: (touch1.clientX + touch2.clientX) / 2,
+        y: (touch1.clientY + touch2.clientY) / 2
+      };
+
+      const scale = dist / initialTouchDistance.current;
+      const newZoom = Math.min(Math.max(initialZoom.current * scale, 0.1), 5);
+      
+      const deltaX = center.x - initialTouchCenter.current.x;
+      const deltaY = center.y - initialTouchCenter.current.y;
+      
+      setZoom(newZoom);
+      setPan({
+        x: initialPan.current.x + deltaX,
+        y: initialPan.current.y + deltaY
+      });
+      return;
+    }
+
     // Update cursor position
     if (!('touches' in e)) {
        const { x, y } = getCoordinates(e);
@@ -335,7 +473,12 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
     lastPos.current = { x, y };
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = (e?: React.MouseEvent | React.TouchEvent) => {
+    if (e && 'touches' in e && e.touches.length < 2) {
+      initialTouchDistance.current = null;
+      initialTouchCenter.current = null;
+    }
+
     if (!isDrawing.current) return;
     isDrawing.current = false;
     lastPos.current = null;
@@ -420,10 +563,10 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
     // Only handle drawing stop here, panning is handled by window listener
     if (!isPanning.current) {
-        stopDrawing();
+        stopDrawing(e);
     }
   };
 
@@ -436,10 +579,10 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
      }
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (e: React.MouseEvent) => {
      setCursorPos(null);
      // Do not stop panning here, window listener handles it
-     stopDrawing();
+     stopDrawing(e);
   };
 
   // --- Layer Management ---
@@ -643,7 +786,11 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   };
 
   return (
-    <div className={`flex h-full w-full overflow-hidden ${isDarkMode ? 'bg-[#1e1f22]' : 'bg-gray-100'}`}>
+    <div 
+      className={`flex h-full w-full overflow-hidden ${isDarkMode ? 'bg-[#1e1f22]' : 'bg-gray-100'}`}
+      onTouchStart={handleTouchStartGlobal}
+      onTouchEnd={handleTouchEndGlobal}
+    >
       
       {/* Toast Notification */}
       {showToast && (
@@ -689,7 +836,7 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
       {/* Main Canvas Area */}
       <div 
         ref={wrapperRef}
-        className="flex-1 relative overflow-hidden flex items-center justify-center"
+        className="flex-1 relative overflow-hidden flex items-center justify-center touch-none"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -844,21 +991,49 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
 
       {/* Right Sidebar: Layers */}
       {!isPresentationMode && (
-        <div className={`w-72 flex-shrink-0 z-20 ${isDarkMode ? 'bg-[#2b2d31] border-l border-[#1e1f22]' : 'bg-white border-l border-gray-200'}`}>
-          <LayerManager 
-            layers={layers}
-            activeLayerId={activeLayerId}
-            onSelectLayer={setActiveLayerId}
-            onToggleVisibility={toggleVisibility}
-            onToggleLock={toggleLock}
-            onAddLayer={addLayer}
-            onDeleteLayer={deleteLayer}
-            onReorderLayer={reorderLayer}
-            onRenameLayer={renameLayer}
-            onUpdateOpacity={updateLayerOpacity}
-            isDarkMode={isDarkMode}
-          />
-        </div>
+        <>
+          {/* Toggle Button */}
+          <button
+            onClick={() => setIsLayersVisible(!isLayersVisible)}
+            className={`absolute top-4 right-4 z-30 p-2 rounded-xl shadow-lg transition-colors ${
+              isDarkMode ? 'bg-[#2b2d31] hover:bg-[#35383c] text-white' : 'bg-white hover:bg-gray-100 text-gray-900'
+            }`}
+            title={isLayersVisible ? "Скрыть слои" : "Показать слои"}
+          >
+            <Layers size={20} />
+          </button>
+
+          {isLayersVisible && (
+            <div 
+              className={`flex-shrink-0 z-20 absolute right-0 top-0 bottom-0 md:relative flex ${isDarkMode ? 'bg-[#2b2d31] border-l border-[#1e1f22]' : 'bg-white border-l border-gray-200'}`}
+              style={{ width: layersWidth }}
+            >
+              {/* Resize Handle */}
+              <div
+                className="absolute -left-2 top-0 bottom-0 w-4 cursor-col-resize hover:bg-[#5865f2]/50 transition-colors z-30 flex items-center justify-center"
+                onMouseDown={handleResizeStart}
+                onTouchStart={handleResizeStart}
+              >
+                <div className="w-1 h-12 bg-gray-400/50 rounded-full" />
+              </div>
+              <div className="flex-1 overflow-hidden pt-14">
+                <LayerManager 
+                  layers={layers}
+                  activeLayerId={activeLayerId}
+                  onSelectLayer={setActiveLayerId}
+                  onToggleVisibility={toggleVisibility}
+                  onToggleLock={toggleLock}
+                  onAddLayer={addLayer}
+                  onDeleteLayer={deleteLayer}
+                  onReorderLayer={reorderLayer}
+                  onRenameLayer={renameLayer}
+                  onUpdateOpacity={updateLayerOpacity}
+                  isDarkMode={isDarkMode}
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Export Modal */}

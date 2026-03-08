@@ -58,10 +58,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
             <button 
               onClick={() => onOpenBrowser('https://school-helper.ru/#/auth')}
-              className="w-full py-3.5 rounded-xl font-bold bg-white text-gray-900 hover:bg-gray-50 transition-all flex items-center justify-center gap-2 border border-gray-200"
+              className={`w-full py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border ${isDarkMode ? 'bg-[#2b2d31] hover:bg-[#35373c] text-white border-white/5' : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-200 shadow-sm'}`}
             >
               <img src="https://www.google.com/favicon.ico" alt="G" className="w-5 h-5" />
-              <span>Войти как User</span>
+              <span>Войти через сайт</span>
             </button>
 
             <div className="flex items-center gap-2 justify-center mt-6 cursor-pointer group select-none" onClick={() => setDontShowAgain(!dontShowAgain)}>
@@ -76,18 +76,18 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         ) : (
           /* Role Selection */
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <h3 className="text-lg font-bold mb-6">Выберите роль</h3>
-            <div className="grid grid-cols-2 gap-3 p-1 bg-[#111214] rounded-xl border border-white/5">
+            <h3 className={`text-lg font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Выберите роль</h3>
+            <div className={`grid grid-cols-2 gap-3 p-1.5 rounded-2xl border transition-colors ${isDarkMode ? 'bg-[#111214] border-white/5' : 'bg-gray-100 border-gray-200'}`}>
               <button 
                 onClick={() => handleRoleSelect('student')}
-                className="flex items-center justify-center gap-2 py-3 rounded-lg hover:bg-[#2b2d31] transition-colors text-gray-300 hover:text-white font-medium"
+                className={`flex items-center justify-center gap-2 py-3.5 rounded-xl transition-all font-bold ${isDarkMode ? 'hover:bg-[#2b2d31] text-gray-400 hover:text-white' : 'bg-white/50 hover:bg-white text-gray-600 hover:text-gray-900 shadow-sm hover:shadow-md'}`}
               >
                 <Backpack size={18} />
                 Я Ученик
               </button>
               <button 
                 onClick={() => handleRoleSelect('teacher')}
-                className="flex items-center justify-center gap-2 py-3 rounded-lg hover:bg-[#2b2d31] transition-colors text-gray-300 hover:text-white font-medium"
+                className={`flex items-center justify-center gap-2 py-3.5 rounded-xl transition-all font-bold ${isDarkMode ? 'hover:bg-[#2b2d31] text-gray-400 hover:text-white' : 'bg-white/50 hover:bg-white text-gray-600 hover:text-gray-900 shadow-sm hover:shadow-md'}`}
               >
                 <GraduationCap size={18} />
                 Я Учитель
@@ -95,7 +95,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </div>
             <button 
               onClick={() => setShowRoleSelection(false)}
-              className={`mt-6 text-sm font-medium hover:underline ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}
+              className={`mt-8 text-sm font-bold transition-colors ${isDarkMode ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
             >
               Назад
             </button>

@@ -349,6 +349,49 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
     setZoom(prev => Math.min(Math.max(prev * factor, 5), 2000));
   };
 
+  const initialTouchDistance = useRef<number | null>(null);
+  const initialZoom = useRef<number>(50);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      initialTouchDistance.current = dist;
+      initialZoom.current = zoom;
+      setIsDragging(false);
+      return;
+    }
+    setIsDragging(true);
+    setLastMousePos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      if (initialTouchDistance.current === null) return;
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      const scale = dist / initialTouchDistance.current;
+      setZoom(Math.min(Math.max(initialZoom.current * scale, 5), 2000));
+      return;
+    }
+
+    if (isDragging) {
+      const dx = e.touches[0].clientX - lastMousePos.x;
+      const dy = e.touches[0].clientY - lastMousePos.y;
+      setViewOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      setLastMousePos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      initialTouchDistance.current = null;
+    }
+    setIsDragging(false);
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     setLastMousePos({ x: e.clientX, y: e.clientY });
@@ -391,11 +434,11 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
 
   const handleMouseUp = () => setIsDragging(false);
 
-  const btnBase = "flex items-center justify-center rounded-2xl font-bold transition-all transform active:scale-95 shadow-md h-full w-full min-h-[44px]";
-  const btnNum = isDarkMode ? `${btnBase} bg-[#4f545c] hover:bg-[#5d6269] text-white text-xl md:text-2xl` : `${btnBase} bg-gray-200 hover:bg-gray-300 text-gray-800 text-xl md:text-2xl`;
+  const btnBase = "flex items-center justify-center rounded-2xl font-bold transition-all transform active:scale-95 shadow-md h-full w-full min-h-[44px] md:min-h-[48px]";
+  const btnNum = isDarkMode ? `${btnBase} bg-[#4f545c] hover:bg-[#5d6269] text-white text-lg md:text-2xl` : `${btnBase} bg-gray-200 hover:bg-gray-300 text-gray-800 text-lg md:text-2xl`;
   const btnOp = `${btnBase} bg-[#5865f2] hover:bg-[#4752c4] text-white`;
-  const btnSci = isDarkMode ? `${btnBase} bg-[#36393f] hover:bg-[#424549] text-[#b9bbbe] text-sm` : `${btnBase} bg-gray-100 hover:bg-gray-200 text-gray-500 text-sm`;
-  const btnAction = `${btnBase} bg-[#ed4245] hover:bg-red-600 text-white text-lg`;
+  const btnSci = isDarkMode ? `${btnBase} bg-[#36393f] hover:bg-[#424549] text-[#b9bbbe] text-xs md:text-sm` : `${btnBase} bg-gray-100 hover:bg-gray-200 text-gray-500 text-xs md:text-sm`;
+  const btnAction = `${btnBase} bg-[#ed4245] hover:bg-red-600 text-white text-sm md:text-lg`;
 
   const displayBg = isDarkMode ? 'bg-[#202225]' : 'bg-gray-100';
   const textColor = isDarkMode ? 'text-white' : 'text-gray-900';
@@ -408,12 +451,12 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
   );
 
   const FunctionShortcuts = ({ isFloating = false }: { isFloating?: boolean }) => (
-    <div className={`grid grid-cols-7 gap-1 overflow-x-auto no-scrollbar pb-1 ${!isFloating ? 'mt-3 shrink-0' : ''}`}>
+    <div className={`flex gap-1 overflow-x-auto no-scrollbar pb-1 ${!isFloating ? 'mt-3 shrink-0' : ''}`}>
       {['x', '^', '(', ')', 'sin', 'cos', 'tan', 'sqrt', 'log', 'pi', '/', '*', '+', '-'].map(sym => (
         <button 
           key={sym} 
           onClick={() => setFunctionText(prev => prev + (['sin','cos','tan','sqrt','log'].includes(sym) ? `${sym}(` : sym))} 
-          className={`py-2 rounded-xl font-mono text-[10px] md:text-xs font-bold border transition-colors ${isDarkMode ? (isFloating ? 'bg-white/10 border-white/10 text-gray-300 hover:bg-white/20 hover:text-white' : 'bg-[#36393f] border-white/5 text-gray-400 hover:text-white') : (isFloating ? 'bg-black/5 border-black/10 text-gray-700 hover:bg-black/10' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50')}`}
+          className={`px-3 py-2 shrink-0 rounded-xl font-mono text-[10px] md:text-xs font-bold border transition-colors ${isDarkMode ? (isFloating ? 'bg-white/10 border-white/10 text-gray-300 hover:bg-white/20 hover:text-white' : 'bg-[#36393f] border-white/5 text-gray-400 hover:text-white') : (isFloating ? 'bg-black/5 border-black/10 text-gray-700 hover:bg-black/10' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50')}`}
         >
           {sym}
         </button>
@@ -442,11 +485,11 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
         {activeTab !== 'graphing' ? (
           <div className="flex flex-col h-full overflow-hidden">
-            <div className={`p-5 md:p-8 rounded-3xl text-right mb-4 transition-all shadow-inner flex flex-col justify-end border shrink-0 flex-[0_0_auto] min-h-[120px] max-h-[30%] ${displayBg} ${isDarkMode ? 'border-white/5' : 'border-gray-200'}`}>
-              <div className="text-[#8e9297] text-xs md:text-sm font-medium mb-2 overflow-hidden truncate font-mono tracking-wide leading-normal">
+            <div className={`p-4 md:p-8 rounded-3xl text-right mb-4 transition-all shadow-inner flex flex-col justify-end border shrink-0 flex-[0_0_auto] min-h-[80px] md:min-h-[120px] max-h-[30%] ${displayBg} ${isDarkMode ? 'border-white/5' : 'border-gray-200'}`}>
+              <div className="text-[#8e9297] text-xs md:text-sm font-medium mb-1 md:mb-2 overflow-hidden truncate font-mono tracking-wide leading-normal">
                 {expression || previewResult}
               </div>
-              <div className={`font-bold truncate tracking-tight transition-all leading-normal ${textColor} ${display.length > 10 ? 'text-3xl md:text-5xl' : 'text-4xl md:text-6xl'}`}>
+              <div className={`font-bold truncate tracking-tight transition-all leading-normal ${textColor} ${display.length > 10 ? 'text-2xl md:text-5xl' : 'text-3xl md:text-6xl'}`}>
                 {display}
               </div>
             </div>
@@ -547,7 +590,7 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
               )}
               */}
 
-              <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onWheel={handleWheel} className="w-full h-full block" />
+              <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="w-full h-full block touch-none" />
               
               {showCoords && !isDragging && <CoordinateOverlay />}
               
@@ -585,36 +628,36 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
       </div>
 
       {isFullscreen && (
-        <div className={`fixed inset-0 z-[2000] backdrop-blur-xl flex flex-col p-4 md:p-6 ${isDarkMode ? 'bg-black/95' : 'bg-white/95'}`}>
-           <div className="flex items-center justify-between mb-4 md:mb-6 shrink-0">
-              <button onClick={() => setIsFullscreen(false)} className={`p-3 rounded-2xl ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
-                <Shrink size={24} />
+        <div className={`fixed inset-0 z-[2000] backdrop-blur-xl flex flex-col p-2 md:p-6 ${isDarkMode ? 'bg-black/95' : 'bg-white/95'}`}>
+           <div className="flex items-center justify-between mb-2 md:mb-6 shrink-0 gap-2">
+              <button onClick={() => setIsFullscreen(false)} className={`p-2 md:p-3 rounded-2xl ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+                <Shrink size={20} className="md:w-6 md:h-6" />
               </button>
-              <div className={`flex items-center gap-4 p-3 rounded-2xl border w-full max-w-xl shadow-2xl transition-all ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-gray-100 border-gray-200'}`}>
-                 <span className="text-xl font-bold text-[#5865f2] ml-2 shrink-0">f(x) =</span>
+              <div className={`flex items-center gap-2 md:gap-4 p-2 md:p-3 rounded-2xl border w-full max-w-xl shadow-2xl transition-all ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-gray-100 border-gray-200'}`}>
+                 <span className="text-lg md:text-xl font-bold text-[#5865f2] ml-1 md:ml-2 shrink-0">f(x) =</span>
                  <input 
                    value={functionText} 
                    onChange={(e) => setFunctionText(e.target.value)} 
-                   className={`bg-transparent border-none flex-1 text-xl font-mono outline-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`} 
+                   className={`bg-transparent border-none flex-1 text-lg md:text-xl font-mono outline-none min-w-0 ${isDarkMode ? 'text-white' : 'text-gray-900'}`} 
                    autoFocus 
                  />
-                 <button onClick={() => { setViewOffset({x:0,y:0}); setZoom(50); setFunctionText(''); }} className="p-2 mr-2 hover:bg-red-400/10 rounded-xl text-red-400" title="Сброс">
-                   <RotateCcw size={18} />
+                 <button onClick={() => { setViewOffset({x:0,y:0}); setZoom(50); setFunctionText(''); }} className="p-1.5 md:p-2 mr-1 md:mr-2 hover:bg-red-400/10 rounded-xl text-red-400 shrink-0" title="Сброс">
+                   <RotateCcw size={16} className="md:w-[18px] md:h-[18px]" />
                  </button>
               </div>
-              <div className="w-12" />
+              <div className="w-10 md:w-12" />
            </div>
            
-           <div className={`flex-1 rounded-[32px] md:rounded-[40px] overflow-hidden relative border shadow-2xl ${isDarkMode ? 'border-white/10 bg-black/40' : 'border-gray-200 bg-gray-50'}`} onMouseLeave={() => setShowCoords(false)}>
-              <canvas ref={fullCanvasRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onWheel={handleWheel} className="w-full h-full block" />
+           <div className={`flex-1 rounded-[24px] md:rounded-[40px] overflow-hidden relative border shadow-2xl ${isDarkMode ? 'border-white/10 bg-black/40' : 'border-gray-200 bg-gray-50'}`} onMouseLeave={() => setShowCoords(false)}>
+              <canvas ref={fullCanvasRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} className="w-full h-full block touch-none" />
               
               {showCoords && !isDragging && <CoordinateOverlay />}
 
               <div className="absolute top-4 right-4 flex flex-col gap-2">
-                 <button onClick={() => setShowHelp(!showHelp)} className={`p-3 backdrop-blur-md rounded-2xl shadow-lg border transition-all ${showHelp ? 'bg-[#faa61a] text-white border-transparent' : (isDarkMode ? 'bg-black/40 text-white border-transparent' : 'bg-white text-gray-600 border-gray-200')}`} title="Подсказка">
+                 <button onClick={() => setShowHelp(!showHelp)} className={`hidden md:block p-3 backdrop-blur-md rounded-2xl shadow-lg border transition-all ${showHelp ? 'bg-[#faa61a] text-white border-transparent' : (isDarkMode ? 'bg-black/40 text-white border-transparent' : 'bg-white text-gray-600 border-gray-200')}`} title="Подсказка">
                    <HelpCircle size={20} />
                  </button>
-                 <button onClick={() => setIsSnapActive(!isSnapActive)} className={`p-3 backdrop-blur-md rounded-2xl shadow-lg border transition-all ${isSnapActive ? 'bg-[#5865f2] text-white border-transparent' : (isDarkMode ? 'bg-black/40 text-white border-transparent' : 'bg-white text-gray-600 border-gray-200')}`} title="Привязка к сетке">
+                 <button onClick={() => setIsSnapActive(!isSnapActive)} className={`p-2 md:p-3 backdrop-blur-md rounded-2xl shadow-lg border transition-all ${isSnapActive ? 'bg-[#5865f2] text-white border-transparent' : (isDarkMode ? 'bg-black/40 text-white border-transparent' : 'bg-white text-gray-600 border-gray-200')}`} title="Привязка к сетке">
                    <Magnet size={20} />
                  </button>
               </div>

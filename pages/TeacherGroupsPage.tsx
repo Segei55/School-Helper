@@ -3,7 +3,6 @@ import {
   Grid, 
   Users, 
   Shuffle, 
-  Copy, 
   RefreshCw, 
   Settings2,
   AlertCircle,
@@ -143,16 +142,6 @@ const TeacherGroupsPage: React.FC<TeacherGroupsPageProps> = ({ isDarkMode }) => 
       }
   };
 
-  const copyGroupToClipboard = (group: Group) => {
-    const text = `${group.name}:\n${group.students.map(s => `${s.lastName} ${s.firstName}`).join('\n')}`;
-    navigator.clipboard.writeText(text);
-  };
-
-  const copyAllToClipboard = () => {
-    const text = groups.map(g => `${g.name}:\n${g.students.map(s => `${s.lastName} ${s.firstName}`).join('\n')}`).join('\n\n');
-    navigator.clipboard.writeText(text);
-  };
-
   const bgColor = isDarkMode ? 'bg-[#1e1f22]' : 'bg-gray-50';
   const cardBg = isDarkMode ? 'bg-[#2b2d31]' : 'bg-white';
   const textColor = isDarkMode ? 'text-white' : 'text-gray-900';
@@ -255,13 +244,6 @@ const TeacherGroupsPage: React.FC<TeacherGroupsPageProps> = ({ isDarkMode }) => 
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold">Результаты ({groups.length} групп)</h2>
-                  <button 
-                    onClick={copyAllToClipboard}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${hoverBg} ${subTextColor} hover:text-[#eb459e]`}
-                  >
-                    <Copy size={16} />
-                    Скопировать всё
-                  </button>
                 </div>
 
                 <motion.div 
@@ -309,13 +291,6 @@ const TeacherGroupsPage: React.FC<TeacherGroupsPageProps> = ({ isDarkMode }) => 
                               title="Переименовать группу"
                             >
                               <Edit2 size={16} />
-                            </button>
-                            <button 
-                              onClick={() => copyGroupToClipboard(group)}
-                              className={`p-1.5 rounded-md hover:bg-[#eb459e]/10 hover:text-[#eb459e] transition-colors ${subTextColor}`}
-                              title="Скопировать группу"
-                            >
-                              <Copy size={16} />
                             </button>
                           </div>
                         </div>
