@@ -1,4 +1,3 @@
-
 name: Build Desktop App
 
 on:
@@ -24,32 +23,24 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Linux Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ruby ruby-dev rubygems build-essential libarchive-tools
-          sudo gem install --no-document fpm
-
       - name: Install Project Dependencies
         run: npm install
 
       - name: Inject Secrets into Main Process (Linux)
         run: |
-          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); content = content.replace('REPLACE_ME_IN_CI', process.env.OPENROUTER_API_KEY || 'REPLACE_ME_IN_CI'); fs.writeFileSync(path, content);"
+          if [ -n "$OPENROUTER_API_KEY" ]; then
+            sed -i "s/REPLACE_ME_IN_CI/$OPENROUTER_API_KEY/g" electron/main.js
+          fi
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Build Web Application
         run: npm run build
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Build Electron App (Linux)
         run: npx electron-builder --linux AppImage deb tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          USE_SYSTEM_FPM: true
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -76,18 +67,17 @@ jobs:
 
       - name: Inject Secrets into Main Process (Windows)
         run: |
-          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); content = content.replace('REPLACE_ME_IN_CI', process.env.OPENROUTER_API_KEY || 'REPLACE_ME_IN_CI'); fs.writeFileSync(path, content);"
+          if ($env:OPENROUTER_API_KEY) {
+            (Get-Content electron/main.js) -replace 'REPLACE_ME_IN_CI', $env:OPENROUTER_API_KEY | Set-Content electron/main.js
+          }
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Build Web Application
         run: npm run build
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Build Electron App (exe)
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win nsis portable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -95,7 +85,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: school-helper-windows
-          path: dist_electron/*.exe
+          path: |
+            dist_electron/*.exe
+            dist_electron/*.exe
 
   build-android:
     runs-on: ubuntu-latest
@@ -119,9 +111,6 @@ jobs:
 
       - name: Build Web Application
         run: npm run build
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -154,9 +143,6 @@ jobs:
 
       - name: Build Web Application
         run: npm run build
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Upload Web Artifact
         uses: actions/upload-artifact@v4
