@@ -514,17 +514,17 @@ const BrowserPage: React.FC<BrowserPageProps> = ({ isDarkMode = true, isLoggedIn
          </div>
 
          {/* Navigation Bar */}
-         <div className={`flex items-center gap-2 p-2 rounded-xl mb-2 ${isDarkMode ? 'bg-[#2f3136]' : 'bg-white shadow-sm'}`}>
-            <button onClick={goBack} disabled={!tabs.find(t=>t.id===activeTabId)?.canGoBack} className="p-2 rounded-lg hover:bg-black/10 disabled:opacity-30"><ArrowLeft size={18} /></button>
-            <button onClick={goForward} disabled={!tabs.find(t=>t.id===activeTabId)?.canGoForward} className="p-2 rounded-lg hover:bg-black/10 disabled:opacity-30 hidden sm:block"><ArrowRight size={18} /></button>
-            <button onClick={reload} className="p-2 rounded-lg hover:bg-black/10"><RotateCw size={18} /></button>
-            <button onClick={goHome} className="p-2 rounded-lg hover:bg-black/10 hidden sm:block"><Home size={18} /></button>
+         <div className={`flex items-center gap-1 md:gap-2 p-1.5 md:p-2 rounded-xl mb-2 ${isDarkMode ? 'bg-[#2f3136]' : 'bg-white shadow-sm'}`}>
+            <button onClick={goBack} disabled={!tabs.find(t=>t.id===activeTabId)?.canGoBack} className="p-1.5 md:p-2 rounded-lg hover:bg-black/10 disabled:opacity-30 shrink-0"><ArrowLeft size={18} /></button>
+            <button onClick={goForward} disabled={!tabs.find(t=>t.id===activeTabId)?.canGoForward} className="p-1.5 md:p-2 rounded-lg hover:bg-black/10 disabled:opacity-30 hidden sm:block shrink-0"><ArrowRight size={18} /></button>
+            <button onClick={reload} className="p-1.5 md:p-2 rounded-lg hover:bg-black/10 shrink-0"><RotateCw size={18} /></button>
+            <button onClick={goHome} className="p-1.5 md:p-2 rounded-lg hover:bg-black/10 hidden sm:block shrink-0"><Home size={18} /></button>
 
             {/* URL Input */}
-            <div className={`flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg border focus-within:ring-2 focus-within:ring-blue-500/50 transition-all min-w-0 ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`flex-1 flex items-center gap-1 md:gap-2 px-2 md:px-3 py-1 md:py-1.5 rounded-lg border focus-within:ring-2 focus-within:ring-blue-500/50 transition-all min-w-0 w-full ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
                 {settings.homePage.includes('ya.ru') && <span className="text-red-500 font-bold shrink-0">Y</span>}
                 <input 
-                    className="flex-1 bg-transparent border-none outline-none text-sm font-medium min-w-0"
+                    className="flex-1 bg-transparent border-none outline-none text-xs md:text-sm font-medium min-w-0 w-full"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     onKeyDown={handleInputKeyDown}
@@ -536,14 +536,14 @@ const BrowserPage: React.FC<BrowserPageProps> = ({ isDarkMode = true, isLoggedIn
             {/* Menu Actions */}
             <button 
                 onClick={toggleAdBlock} 
-                className={`p-2 rounded-lg transition-colors hidden sm:block ${settings.adBlockEnabled ? 'text-blue-500 bg-blue-500/10' : 'text-gray-400'}`}
+                className={`p-1.5 md:p-2 rounded-lg transition-colors hidden sm:block shrink-0 ${settings.adBlockEnabled ? 'text-blue-500 bg-blue-500/10' : 'text-gray-400'}`}
                 title={settings.adBlockEnabled ? "Реклама блокируется" : "Блокировщик выключен"}
             >
                 {settings.adBlockEnabled ? <Shield size={18} /> : <ShieldAlert size={18} />}
             </button>
             
-            <button onClick={() => setShowHistory(true)} className="p-2 rounded-lg hover:bg-black/10 hidden sm:block"><History size={18} /></button>
-            <button onClick={() => setShowSettings(true)} className="p-2 rounded-lg hover:bg-black/10"><Settings size={18} /></button>
+            <button onClick={() => setShowHistory(true)} className="p-1.5 md:p-2 rounded-lg hover:bg-black/10 hidden sm:block shrink-0"><History size={18} /></button>
+            <button onClick={() => setShowSettings(true)} className="p-1.5 md:p-2 rounded-lg hover:bg-black/10 shrink-0"><Settings size={18} /></button>
          </div>
       </div>
 

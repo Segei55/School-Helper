@@ -630,22 +630,22 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
       {isFullscreen && (
         <div className={`fixed inset-0 z-[2000] backdrop-blur-xl flex flex-col p-2 md:p-6 ${isDarkMode ? 'bg-black/95' : 'bg-white/95'}`}>
            <div className="flex items-center justify-between mb-2 md:mb-6 shrink-0 gap-2">
-              <button onClick={() => setIsFullscreen(false)} className={`p-2 md:p-3 rounded-2xl ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
+              <button onClick={() => setIsFullscreen(false)} className={`p-2 md:p-3 rounded-2xl shrink-0 ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-800'}`}>
                 <Shrink size={20} className="md:w-6 md:h-6" />
               </button>
-              <div className={`flex items-center gap-2 md:gap-4 p-2 md:p-3 rounded-2xl border w-full max-w-xl shadow-2xl transition-all ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-gray-100 border-gray-200'}`}>
-                 <span className="text-lg md:text-xl font-bold text-[#5865f2] ml-1 md:ml-2 shrink-0">f(x) =</span>
+              <div className={`flex items-center gap-1 md:gap-4 p-1.5 md:p-3 rounded-2xl border w-full max-w-xl shadow-2xl transition-all ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-gray-100 border-gray-200'}`}>
+                 <span className="text-sm md:text-xl font-bold text-[#5865f2] ml-1 md:ml-2 shrink-0">f(x)=</span>
                  <input 
                    value={functionText} 
                    onChange={(e) => setFunctionText(e.target.value)} 
-                   className={`bg-transparent border-none flex-1 text-lg md:text-xl font-mono outline-none min-w-0 ${isDarkMode ? 'text-white' : 'text-gray-900'}`} 
+                   className={`bg-transparent border-none flex-1 text-base md:text-xl font-mono outline-none min-w-0 w-full ${isDarkMode ? 'text-white' : 'text-gray-900'}`} 
                    autoFocus 
                  />
                  <button onClick={() => { setViewOffset({x:0,y:0}); setZoom(50); setFunctionText(''); }} className="p-1.5 md:p-2 mr-1 md:mr-2 hover:bg-red-400/10 rounded-xl text-red-400 shrink-0" title="Сброс">
                    <RotateCcw size={16} className="md:w-[18px] md:h-[18px]" />
                  </button>
               </div>
-              <div className="w-10 md:w-12" />
+              <div className="w-10 md:w-12 hidden md:block shrink-0" />
            </div>
            
            <div className={`flex-1 rounded-[24px] md:rounded-[40px] overflow-hidden relative border shadow-2xl ${isDarkMode ? 'border-white/10 bg-black/40' : 'border-gray-200 bg-gray-50'}`} onMouseLeave={() => setShowCoords(false)}>
@@ -654,9 +654,6 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
               {showCoords && !isDragging && <CoordinateOverlay />}
 
               <div className="absolute top-4 right-4 flex flex-col gap-2">
-                 <button onClick={() => setShowHelp(!showHelp)} className={`hidden md:block p-3 backdrop-blur-md rounded-2xl shadow-lg border transition-all ${showHelp ? 'bg-[#faa61a] text-white border-transparent' : (isDarkMode ? 'bg-black/40 text-white border-transparent' : 'bg-white text-gray-600 border-gray-200')}`} title="Подсказка">
-                   <HelpCircle size={20} />
-                 </button>
                  <button onClick={() => setIsSnapActive(!isSnapActive)} className={`p-2 md:p-3 backdrop-blur-md rounded-2xl shadow-lg border transition-all ${isSnapActive ? 'bg-[#5865f2] text-white border-transparent' : (isDarkMode ? 'bg-black/40 text-white border-transparent' : 'bg-white text-gray-600 border-gray-200')}`} title="Привязка к сетке">
                    <Magnet size={20} />
                  </button>

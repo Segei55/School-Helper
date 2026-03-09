@@ -19,7 +19,8 @@
     "build:linux": "npm run build && cross-env USE_SYSTEM_FPM=true ELECTRON_BUILDER_CACHE=~/.cache/electron-builder electron-builder --linux",
     "build:appimage": "npm run build && electron-builder --linux AppImage",
     "build:snap": "npm run build && electron-builder --linux snap",
-    "build:linux-fix": "rm -rf .cache dist_electron && npm run build:linux"
+    "build:linux-fix": "rm -rf .cache dist_electron && npm run build:linux",
+    "build:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
