@@ -17,8 +17,6 @@ import PlannerPage from './pages/PlannerPage';
 import StopwatchPage from './pages/StopwatchPage';
 import TimerPage from './pages/TimerPage';
 import BrowserPage from './pages/BrowserPage';
-import { LocalNotifications } from '@capacitor/local-notifications';
-import { App as CapacitorApp } from '@capacitor/app';
 import TeacherPage from './pages/TeacherPage'; 
 import TeacherGroupsPage from './pages/TeacherGroupsPage'; 
 import TeacherRandomizerPage from './pages/TeacherRandomizerPage';
@@ -248,28 +246,6 @@ const App: React.FC = () => {
         return config ? (JSON.parse(config).isSidebarCollapsed || false) : false;
       } catch { return false; }
   });
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const touchStartX = useRef<number | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchEndX - touchStartX.current;
-
-    // Swipe right to open
-    if (diff > 50 && touchStartX.current < 50) {
-      setIsMobileSidebarOpen(true);
-    }
-    // Swipe left to close
-    else if (diff < -50 && isMobileSidebarOpen) {
-      setIsMobileSidebarOpen(false);
-    }
-    touchStartX.current = null;
-  };
 
   // --- RESPONSIVE SIDEBAR ---
   useEffect(() => {
@@ -547,40 +523,6 @@ const App: React.FC = () => {
 
   // --- TIMER LOGIC ---
   useEffect(() => {
-    // Register notification actions
-    const setupNotifications = async () => {
-      try {
-        await LocalNotifications.registerActionTypes({
-          types: [
-            {
-              id: "TIMER_ACTIONS",
-              actions: [
-                {
-                  id: "stop",
-                  title: "Остановить"
-                }
-              ]
-            }
-          ]
-        });
-      } catch (e) {
-        console.log("LocalNotifications not available", e);
-      }
-    };
-    setupNotifications();
-
-    const listener = LocalNotifications.addListener('localNotificationActionPerformed', (notificationAction) => {
-      if (notificationAction.actionId === 'stop') {
-        handleTimerReset();
-      }
-    });
-
-    return () => {
-      listener.then(l => l.remove()).catch(() => {});
-    };
-  }, []);
-
-  useEffect(() => {
     let interval: number | null = null;
     if ((timerStatus === 'running' || timerStatus === 'finished') && timerTarget) {
         interval = window.setInterval(() => {
@@ -598,7 +540,7 @@ const App: React.FC = () => {
     return () => { if (interval) clearInterval(interval); };
   }, [timerStatus, timerTarget, playAlarm, stopAlarm]);
 
-  const handleTimerStart = async (seconds: number) => {
+  const handleTimerStart = (seconds: number) => {
     initAudio(); 
     if (timerStatus === 'idle' || timerStatus === 'finished') {
         setTimerInitial(seconds);
@@ -609,45 +551,21 @@ const App: React.FC = () => {
         setTimerTarget(Date.now() + timerRemaining * 1000);
         setTimerStatus('running');
     }
-
-    try {
-      await LocalNotifications.requestPermissions();
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            title: "Время вышло!",
-            body: "Таймер завершил работу.",
-            id: 1,
-            schedule: { at: new Date(Date.now() + seconds * 1000) },
-            actionTypeId: "TIMER_ACTIONS",
-            extra: null
-          }
-        ]
-      });
-    } catch (e) {
-      console.log("LocalNotifications not available", e);
-    }
   };
 
-  const handleTimerPause = async () => {
+  const handleTimerPause = () => {
     if (timerStatus === 'running') {
         setTimerStatus('paused');
         setTimerTarget(null);
     }
-    try {
-      await LocalNotifications.cancel({ notifications: [{ id: 1 }] });
-    } catch (e) {}
   };
 
-  const handleTimerReset = async () => {
+  const handleTimerReset = () => {
     stopAlarm();
     setTimerStatus('idle');
     setTimerTarget(null);
     setTimerRemaining(0);
     setTimerInitial(0);
-    try {
-      await LocalNotifications.cancel({ notifications: [{ id: 1 }] });
-    } catch (e) {}
   };
 
   const handleSwToggle = () => {
@@ -1089,11 +1007,7 @@ const App: React.FC = () => {
           />
         </div>
       ) : (
-        <div 
-          className={`flex flex-1 w-full h-full overflow-hidden transition-opacity duration-300 ${isDarkMode ? 'bg-[#202225] text-white' : 'bg-[#e3e5e8] text-gray-900'} ${(!isAppReady || isLocked) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
+        <div className={`flex flex-1 w-full h-full overflow-hidden transition-opacity duration-300 ${isDarkMode ? 'bg-[#202225] text-white' : 'bg-[#e3e5e8] text-gray-900'} ${(!isAppReady || isLocked) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="flex w-full h-full">
             <Sidebar 
               activeId={activeSection} 
@@ -1104,16 +1018,10 @@ const App: React.FC = () => {
               onToggleCollapse={toggleSidebar}
               sidebarMode={sidebarMode}
               onBackToMain={handleBackToMain}
-              isMobileOpen={isMobileSidebarOpen}
-              onCloseMobile={() => setIsMobileSidebarOpen(false)}
             />
 
             <div className="flex flex-col flex-1 overflow-hidden relative">
-              <Header 
-                activeLabel={[...SECTIONS, ...TEACHER_SECTIONS].find(s => s.id === activeSection)?.label || ''} 
-                isDarkMode={isDarkMode} 
-                onOpenSidebar={() => setIsMobileSidebarOpen(true)}
-              />
+              <Header activeLabel={[...SECTIONS, ...TEACHER_SECTIONS].find(s => s.id === activeSection)?.label || ''} isDarkMode={isDarkMode} />
               
               <main className="flex-1 overflow-hidden p-0 sm:p-2 md:p-3 relative z-0">
                 <div className={`rounded-none sm:rounded-xl shadow-xl p-2 sm:p-4 h-full overflow-y-auto transition-colors duration-300 relative ${isDarkMode ? 'bg-[#2f3136]' : 'bg-white'}`}>

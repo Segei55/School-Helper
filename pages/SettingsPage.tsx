@@ -387,8 +387,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
             </div>
         </div>
 
-        {/* Controls Settings - Hidden on Mobile */}
-        <div className={`hidden md:block ${cardClasses} p-6 rounded-2xl space-y-4`}>
+        {/* Controls Settings */}
+        <div className={`${cardClasses} p-6 rounded-2xl space-y-4`}>
             <div className="flex items-center gap-2 font-bold mb-4">
                <Keyboard size={20} className="text-[#eb459e]" />
                <span>Управление</span>

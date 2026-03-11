@@ -232,39 +232,44 @@ const GradesPage: React.FC<GradesPageProps> = ({ isDarkMode = true, isLoggedIn, 
              </div>
 
              {/* Chart */}
-             <div className={`h-[220px] shrink-0 rounded-3xl p-2 shadow-inner border relative overflow-hidden ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+             <div className={`h-[220px] shrink-0 rounded-3xl p-2 shadow-inner border relative ${isDarkMode ? 'bg-[#202225] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+                {/* TEMPORARILY HIDDEN
+                {!isPremium && (
+                   <PremiumOverlay 
+                     title="График успеваемости"
+                     isDarkMode={isDarkMode}
+                     onOpenModal={() => onTriggerPremium && onTriggerPremium('stats')}
+                   />
+                )}
+                */}
                 {chartData.length > 0 ? (
-                  <div className="w-full h-full overflow-x-auto overflow-y-hidden no-scrollbar">
-                    <div style={{ width: `${chartData.length * 60}px`, minWidth: '100%', height: '100%' }}>
-                      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                        <BarChart data={chartData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#424549" : "#e5e7eb"} vertical={false} />
-                          <XAxis dataKey="subject" stroke={isDarkMode ? "#8e9297" : "#9ca3af"} fontSize={10} tickLine={false} axisLine={false} tick={{fill: isDarkMode ? '#8e9297' : '#6b7280'}} interval={0} />
-                          <YAxis domain={[0, 5]} ticks={[2,3,4,5]} stroke={isDarkMode ? "#8e9297" : "#9ca3af"} tickLine={false} axisLine={false} tick={{fill: isDarkMode ? '#8e9297' : '#6b7280'}} />
-                          <Tooltip 
-                            cursor={{ fill: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }}
-                            formatter={(value: number | undefined) => [value, '']}
-                            separator=""
-                            contentStyle={{ 
-                              backgroundColor: isDarkMode ? '#1a1c1e' : '#ffffff', 
-                              border: 'none',
-                              borderRadius: '12px',
-                              boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
-                              padding: '12px'
-                            }}
-                            itemStyle={{ color: '#5865f2', fontWeight: 800, fontSize: '14px' }}
-                            labelStyle={{ color: isDarkMode ? '#9ca3af' : '#6b7280', fontSize: '11px', marginBottom: '4px' }}
-                            labelFormatter={(label) => label}
-                          />
-                          <Bar name="Средний балл: " dataKey="value" radius={[6, 6, 0, 0]} animationDuration={1000}>
-                            {chartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.value >= 4.5 ? '#60a5fa' : entry.value >= 3.5 ? '#a3e6aa' : entry.value >= 2.5 ? '#d8b4fe' : '#fca5a5'} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <BarChart data={chartData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#424549" : "#e5e7eb"} vertical={false} />
+                      <XAxis dataKey="subject" stroke={isDarkMode ? "#8e9297" : "#9ca3af"} fontSize={10} tickLine={false} axisLine={false} tick={{fill: isDarkMode ? '#8e9297' : '#6b7280'}} interval={0} />
+                      <YAxis domain={[0, 5]} ticks={[2,3,4,5]} stroke={isDarkMode ? "#8e9297" : "#9ca3af"} tickLine={false} axisLine={false} tick={{fill: isDarkMode ? '#8e9297' : '#6b7280'}} />
+                      <Tooltip 
+                        cursor={{ fill: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' }}
+                        formatter={(value: number | undefined) => [value, '']}
+                        separator=""
+                        contentStyle={{ 
+                          backgroundColor: isDarkMode ? '#1a1c1e' : '#ffffff', 
+                          border: 'none',
+                          borderRadius: '12px',
+                          boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
+                          padding: '12px'
+                        }}
+                        itemStyle={{ color: '#5865f2', fontWeight: 800, fontSize: '14px' }}
+                        labelStyle={{ color: isDarkMode ? '#9ca3af' : '#6b7280', fontSize: '11px', marginBottom: '4px' }}
+                        labelFormatter={(label) => label}
+                      />
+                      <Bar name="Средний балл: " dataKey="value" radius={[6, 6, 0, 0]} animationDuration={1000}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.value >= 4.5 ? '#60a5fa' : entry.value >= 3.5 ? '#a3e6aa' : entry.value >= 2.5 ? '#d8b4fe' : '#fca5a5'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center opacity-40 text-sm gap-2">
                     <TrendingUp size={48} className="opacity-50" />

@@ -1,5 +1,5 @@
 {
-  "name": "Win School Helper Web",
+  "name": "Школьный помощник ПК",
   "version": "0.1.2",
   "description": "A comprehensive student productivity suite featuring grades tracking, notes, drawing tools, calculators, and integrated Gemini AI reasoning.",
   "requestFramePermissions": [
