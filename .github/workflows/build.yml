@@ -31,7 +31,7 @@ jobs:
           sudo gem install --no-document fpm
 
       - name: Install Project Dependencies
-        run: npm install
+        run: npm install --no-package-lock --force
 
       - name: Inject Secrets into Main Process (Linux)
         run: |
@@ -72,7 +72,7 @@ jobs:
           node-version: 20
 
       - name: Install Project Dependencies
-        run: npm install
+        run: npm install --no-package-lock --force
 
       - name: Inject Secrets into Main Process (Windows)
         run: |
