@@ -62,7 +62,8 @@ export const streamMessageFromGemini = async (
       window.electron.streamAiRequest({
           messages, 
           model: modelName,
-          systemInstruction
+          systemInstruction,
+          apiKey
       });
 
       if (signal) {

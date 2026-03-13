@@ -7,9 +7,18 @@ const url = require('url');
 
 // --- LOCAL DEV CONFIG ---
 try {
+    const dotenv = require('dotenv');
+    const envPath = path.join(__dirname, '../.env');
     const envLocalPath = path.join(__dirname, '../.env.local');
+    
+    if (fs.existsSync(envPath)) {
+        const envConfig = dotenv.parse(fs.readFileSync(envPath));
+        for (const k in envConfig) {
+            process.env[k] = envConfig[k];
+        }
+    }
     if (fs.existsSync(envLocalPath)) {
-        const envConfig = require('dotenv').parse(fs.readFileSync(envLocalPath));
+        const envConfig = dotenv.parse(fs.readFileSync(envLocalPath));
         for (const k in envConfig) {
             process.env[k] = envConfig[k];
         }
@@ -20,10 +29,7 @@ try {
 const API_KEY_FALLBACK = ""; 
 
 // SECURITY: KEY FOR AI
-let OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY === 'REPLACE_ME_IN_CI') {
-     OPENROUTER_API_KEY = "REPLACE_ME_IN_CI"; 
-}
+let OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "REPLACE_ME_IN_CI";
 
 let mainWindow;
 let authWindow = null;
@@ -39,7 +45,8 @@ let sessionTokens = {
 // Хранение настроек приложения
 let appSettings = {
   autoLaunch: false,
-  minimizeToTray: true
+  minimizeToTray: true,
+  useInternalBrowser: false
 };
 
 // Пути к файлам конфигурации
@@ -260,6 +267,10 @@ function createWindow() {
                    url.includes('signup');
 
     if (isAuth) {
+        if (!appSettings.useInternalBrowser) {
+            shell.openExternal(url);
+            return { action: 'deny' };
+        }
         return { 
             action: 'allow', 
             overrideBrowserWindowOptions: { 
@@ -271,7 +282,11 @@ function createWindow() {
 
     // Open all external links in the internal browser
     if (url.startsWith('http')) {
-        mainWindow.webContents.send('open-internal-url', url);
+        if (!appSettings.useInternalBrowser) {
+            shell.openExternal(url);
+        } else {
+            mainWindow.webContents.send('open-internal-url', url);
+        }
     }
     return { action: 'deny' };
   });
@@ -280,7 +295,11 @@ function createWindow() {
     const parsedUrl = new URL(navigationUrl);
     if (parsedUrl.protocol !== 'file:' && parsedUrl.protocol !== 'schoolhelper:') {
         event.preventDefault();
-        mainWindow.webContents.send('open-internal-url', navigationUrl);
+        if (!appSettings.useInternalBrowser) {
+            shell.openExternal(navigationUrl);
+        } else {
+            mainWindow.webContents.send('open-internal-url', navigationUrl);
+        }
     }
   });
 
@@ -393,6 +412,12 @@ ipcMain.on('set-auth-token', (event, tokens) => {
 
 ipcMain.handle('google-login', async (event) => {
     const authUrl = "https://school-helper.ru/#/auth?mode=app";
+    
+    if (!appSettings.useInternalBrowser) {
+        shell.openExternal(authUrl);
+        return null;
+    }
+
     if (authWindow && !authWindow.isDestroyed()) {
         authWindow.focus();
         return null;
@@ -418,8 +443,9 @@ ipcMain.handle('google-login', async (event) => {
 });
 
 // --- AI PROXY (SECURE REQUESTS) ---
-ipcMain.on('ai-request', async (event, { messages, model, systemInstruction }) => {
-    if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY.includes('REPLACE_ME')) {
+ipcMain.on('ai-request', async (event, { messages, model, systemInstruction, apiKey }) => {
+    const finalApiKey = apiKey || OPENROUTER_API_KEY;
+    if (!finalApiKey || finalApiKey.includes('REPLACE_ME')) {
         event.sender.send('ai-error', 'API ключ не настроен.');
         return;
     }
@@ -442,7 +468,7 @@ ipcMain.on('ai-request', async (event, { messages, model, systemInstruction }) =
         path: '/api/v1/chat/completions',
     });
 
-    request.setHeader('Authorization', `Bearer ${OPENROUTER_API_KEY}`);
+    request.setHeader('Authorization', `Bearer ${finalApiKey}`);
     request.setHeader('Content-Type', 'application/json');
     request.setHeader('HTTP-Referer', 'https://school-helper.ru');
     request.setHeader('X-Title', 'School Helper Desktop');
@@ -631,6 +657,10 @@ app.on('web-contents-created', (event, contents) => {
                            url.includes('signup');
 
             if (isAuth) {
+                if (!appSettings.useInternalBrowser) {
+                    shell.openExternal(url);
+                    return { action: 'deny' };
+                }
                 return { 
                     action: 'allow', 
                     overrideBrowserWindowOptions: { 
@@ -641,7 +671,11 @@ app.on('web-contents-created', (event, contents) => {
             }
 
             if (mainWindow) {
-                mainWindow.webContents.send('open-internal-url', url);
+                if (!appSettings.useInternalBrowser) {
+                    shell.openExternal(url);
+                } else {
+                    mainWindow.webContents.send('open-internal-url', url);
+                }
             }
             return { action: 'deny' };
         });

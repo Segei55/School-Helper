@@ -57,7 +57,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </button>
 
             <button 
-              onClick={() => onOpenBrowser('https://school-helper.ru/#/auth')}
+              onClick={onGoogleLogin}
               className={`w-full py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border ${isDarkMode ? 'bg-[#2b2d31] hover:bg-[#35373c] text-white border-white/5' : 'bg-white hover:bg-gray-50 text-gray-900 border-gray-200 shadow-sm'}`}
             >
               <img src="https://www.google.com/favicon.ico" alt="G" className="w-5 h-5" />

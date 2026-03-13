@@ -696,7 +696,20 @@ const App: React.FC = () => {
     saveConfig({ isLoggedIn: false, userInfo: null, skipWelcome: false });
   };
 
-  const handleOpenBrowser = (url: string) => {
+  const handleOpenBrowser = async (url: string) => {
+    let useInternal = false;
+    if (window.electron?.getAppSettings) {
+      const settings = await window.electron.getAppSettings();
+      useInternal = settings.useInternalBrowser || false;
+    } else {
+      useInternal = localStorage.getItem('useInternalBrowser') === 'true';
+    }
+
+    if (!useInternal) {
+      window.open(url, '_blank');
+      return;
+    }
+
     setShowWelcome(false);
     setActiveSection(SectionId.Browser);
     setPendingBrowserUrl(url);

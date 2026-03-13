@@ -97,6 +97,7 @@ export interface PlannerEvent {
 export interface AppSettings {
   autoLaunch: boolean;
   minimizeToTray: boolean;
+  useInternalBrowser?: boolean;
 }
 
 export interface AuthTokens {

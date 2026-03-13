@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserInfo } from '../types';
-import { LogOut, Sun, Info, ShieldCheck, LogIn, School, RotateCcw, Monitor, Power, ArrowDownToLine, Star, CreditCard, Sparkles, Crown, Key, Loader2, CheckCircle, AlertTriangle, GraduationCap, Lock, Keyboard, Command } from 'lucide-react';
+import { LogOut, Sun, Info, ShieldCheck, LogIn, School, RotateCcw, Monitor, Power, ArrowDownToLine, Star, CreditCard, Sparkles, Crown, Key, Loader2, CheckCircle, AlertTriangle, GraduationCap, Lock, Keyboard, Command, Globe } from 'lucide-react';
 import PinScreen from '../components/PinScreen';
 import HotkeysModal from '../components/HotkeysModal';
 
@@ -17,6 +17,7 @@ interface SettingsPageProps {
 const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onToggleTheme, onLogout, onGoogleLogin, onResetWelcome, onUpdateUser }) => {
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [minimizeToTray, setMinimizeToTray] = useState(true);
+  const [useInternalBrowser, setUseInternalBrowser] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
   
   // PIN State
@@ -38,13 +39,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
     setHasPin(!!localStorage.getItem('school_helper_pin_hash'));
     
     if (isElectronEnv || isDev) {
-      setIsElectron(true);
+      if (isElectronEnv) setIsElectron(true);
       if (window.electron?.getAppSettings) {
         window.electron.getAppSettings().then(settings => {
           setAutoLaunch(settings.autoLaunch);
           setMinimizeToTray(settings.minimizeToTray);
+          setUseInternalBrowser(settings.useInternalBrowser || false);
         });
+      } else {
+        setUseInternalBrowser(localStorage.getItem('useInternalBrowser') === 'true');
       }
+    } else {
+      setUseInternalBrowser(localStorage.getItem('useInternalBrowser') === 'true');
     }
   }, []);
 
@@ -61,6 +67,16 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
     setMinimizeToTray(newVal);
     if (window.electron?.updateAppSetting) {
       await window.electron.updateAppSetting('minimizeToTray', newVal);
+    }
+  };
+
+  const handleToggleInternalBrowser = async () => {
+    const newVal = !useInternalBrowser;
+    setUseInternalBrowser(newVal);
+    if (window.electron?.updateAppSetting) {
+      await window.electron.updateAppSetting('useInternalBrowser', newVal);
+    } else {
+      localStorage.setItem('useInternalBrowser', String(newVal));
     }
   };
 
@@ -406,6 +422,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ userInfo, isDarkMode, onTog
                 Показать
               </div>
             </button>
+        </div>
+
+        {/* Browser Settings */}
+        <div className={`${cardClasses} p-6 rounded-2xl space-y-4`}>
+            <div className="flex items-center gap-2 font-bold mb-4">
+               <Globe size={20} className="text-[#4285f4]" />
+               <span>Браузер</span>
+            </div>
+            
+            <div className={`flex items-center justify-between p-4 rounded-xl ${subCardClasses}`}>
+                <div className="flex items-center gap-3">
+                    <Globe size={18} className="text-gray-500" />
+                    <span className="font-medium text-sm">Открывать ссылки с помощью встроенного браузера</span>
+                </div>
+                <button 
+                    onClick={handleToggleInternalBrowser}
+                    className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 flex items-center shrink-0 ${useInternalBrowser ? 'bg-[#5865f2]' : 'bg-gray-400'}`}
+                >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 ${useInternalBrowser ? 'translate-x-6' : ''}`} />
+                </button>
+            </div>
         </div>
       </div>
 
