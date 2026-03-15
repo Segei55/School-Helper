@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electron', {
 
   // AI Secure Bridge
   streamAiRequest: (data) => ipcRenderer.send('ai-request', data),
+  polzaChat: (messages, model) => ipcRenderer.invoke('polza-chat', messages, model),
   onAiChunk: (callback) => ipcRenderer.on('ai-chunk', (_event, chunk) => callback(chunk)),
   onAiDone: (callback) => ipcRenderer.on('ai-done', () => callback()),
   onAiError: (callback) => ipcRenderer.on('ai-error', (_event, err) => callback(err)),

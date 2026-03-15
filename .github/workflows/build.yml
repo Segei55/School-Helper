@@ -35,9 +35,10 @@ jobs:
 
       - name: Inject Secrets into Main Process (Linux)
         run: |
-          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); content = content.replace('REPLACE_ME_IN_CI', process.env.OPENROUTER_API_KEY || 'REPLACE_ME_IN_CI'); fs.writeFileSync(path, content);"
+          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); content = content.replace('REPLACE_ME_IN_CI', process.env.OPENROUTER_API_KEY || 'REPLACE_ME_IN_CI').replace('REPLACE_ME_IN_CI_POLZA', process.env.AI_API_KEY || 'REPLACE_ME_IN_CI_POLZA'); fs.writeFileSync(path, content);"
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
 
       - name: Build Web Application
         run: npm run build
@@ -76,9 +77,10 @@ jobs:
 
       - name: Inject Secrets into Main Process (Windows)
         run: |
-          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); content = content.replace('REPLACE_ME_IN_CI', process.env.OPENROUTER_API_KEY || 'REPLACE_ME_IN_CI'); fs.writeFileSync(path, content);"
+          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); content = content.replace('REPLACE_ME_IN_CI', process.env.OPENROUTER_API_KEY || 'REPLACE_ME_IN_CI').replace('REPLACE_ME_IN_CI_POLZA', process.env.AI_API_KEY || 'REPLACE_ME_IN_CI_POLZA'); fs.writeFileSync(path, content);"
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
 
       - name: Build Web Application
         run: npm run build

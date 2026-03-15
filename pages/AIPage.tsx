@@ -236,6 +236,7 @@ const AIPage: React.FC<AIPageProps> = ({
   const [newModelName, setNewModelName] = useState('');
   const [newModelId, setNewModelId] = useState('');
   const [newModelKey, setNewModelKey] = useState('');
+  const [addModelProvider, setAddModelProvider] = useState<'openrouter' | 'polza'>('openrouter');
   const modelSelectorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -255,7 +256,8 @@ const AIPage: React.FC<AIPageProps> = ({
           id: Math.random().toString(36).substr(2, 9),
           name: newModelName,
           modelId: newModelId,
-          apiKey: newModelKey || undefined
+          apiKey: newModelKey || undefined,
+          provider: addModelProvider
       };
       
       setAiModels(prev => [...prev, newModel]);
@@ -328,10 +330,25 @@ const AIPage: React.FC<AIPageProps> = ({
                   <button onClick={() => setShowAddModel(false)} className="absolute top-4 right-4 opacity-50 hover:opacity-100"><X size={20}/></button>
                   <button onClick={() => setShowHelp(true)} className="absolute top-4 right-12 opacity-50 hover:opacity-100 text-[#5865f2]"><HelpCircle size={20}/></button>
                   
-                  <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                       <BotIcon className="text-[#5865f2]" />
                       Добавить нейросеть
                   </h2>
+
+                  <div className={`flex border-b mb-6 ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                      <button 
+                          className={`flex-1 py-2 text-sm font-bold text-center border-b-2 transition-colors ${addModelProvider === 'openrouter' ? 'border-[#5865f2] text-[#5865f2]' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                          onClick={() => setAddModelProvider('openrouter')}
+                      >
+                          OpenRouter
+                      </button>
+                      <button 
+                          className={`flex-1 py-2 text-sm font-bold text-center border-b-2 transition-colors ${addModelProvider === 'polza' ? 'border-[#5865f2] text-[#5865f2]' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                          onClick={() => setAddModelProvider('polza')}
+                      >
+                          polza.ai
+                      </button>
+                  </div>
                   
                   <div className="space-y-4">
                       <div>
@@ -344,24 +361,24 @@ const AIPage: React.FC<AIPageProps> = ({
                           />
                       </div>
                       <div>
-                          <label className="block text-xs font-bold uppercase opacity-50 mb-1">ID Модели (OpenRouter)</label>
+                          <label className="block text-xs font-bold uppercase opacity-50 mb-1">ID Модели ({addModelProvider === 'openrouter' ? 'OpenRouter' : 'Polza.ai'})</label>
                           <input 
                               value={newModelId}
                               onChange={(e) => setNewModelId(e.target.value)}
-                              placeholder="openai/gpt-4o-mini"
+                              placeholder={addModelProvider === 'openrouter' ? 'openai/gpt-4o-mini' : 'anthropic/claude-3-5-sonnet'}
                               className={`w-full p-3 rounded-xl outline-none border transition-all focus:border-[#5865f2] ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}
                           />
                       </div>
                       <div>
-                          <label className="block text-xs font-bold uppercase opacity-50 mb-1">API Key (OpenRouter)</label>
+                          <label className="block text-xs font-bold uppercase opacity-50 mb-1">API Key ({addModelProvider === 'openrouter' ? 'OpenRouter' : 'Polza.ai'})</label>
                           <input 
                               value={newModelKey}
                               onChange={(e) => setNewModelKey(e.target.value)}
                               type="password"
-                              placeholder="sk-or-..."
+                              placeholder={addModelProvider === 'openrouter' ? 'sk-or-...' : 'pza_...'}
                               className={`w-full p-3 rounded-xl outline-none border transition-all focus:border-[#5865f2] ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}
                           />
-                          <p className="text-[10px] opacity-50 mt-1">Оставьте пустым, чтобы использовать встроенный ключ (только для бесплатных моделей)</p>
+                          <p className="text-[10px] opacity-50 mt-1">Оставьте пустым, чтобы использовать встроенный ключ</p>
                       </div>
                       
                       <button 
@@ -384,33 +401,52 @@ const AIPage: React.FC<AIPageProps> = ({
                   
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                       <HelpCircle className="text-[#5865f2]" />
-                      Как подключить OpenRouter?
+                      Как подключить {addModelProvider === 'openrouter' ? 'OpenRouter' : 'Polza.ai'}?
                   </h2>
                   
                   <div className={`space-y-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                      <p>OpenRouter — это агрегатор нейросетей, который дает доступ к GPT-4, Claude 3, Llama 3 и сотням других моделей через один API.</p>
+                      <p>{addModelProvider === 'openrouter' ? 'OpenRouter' : 'Polza.ai'} — это агрегатор нейросетей, который дает доступ к GPT-4, Claude 3, Gemini и другим моделям через один API.</p>
                       
                       <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
                           <h3 className="font-bold mb-2 flex items-center gap-2">1. Получите API Key</h3>
                           <ol className="list-decimal list-inside space-y-1 opacity-80">
-                              <li>Зайдите на <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-[#5865f2] hover:underline">openrouter.ai/keys</a></li>
-                              <li>Войдите через Google или GitHub</li>
-                              <li>Нажмите "Create Key"</li>
-                              <li>Скопируйте ключ (начинается с sk-or-...)</li>
+                              {addModelProvider === 'openrouter' ? (
+                                  <>
+                                      <li>Зайдите на <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-[#5865f2] hover:underline">openrouter.ai/keys</a></li>
+                                      <li>Войдите через Google или GitHub</li>
+                                      <li>Нажмите "Create Key"</li>
+                                      <li>Скопируйте ключ (начинается с sk-or-...)</li>
+                                  </>
+                              ) : (
+                                  <>
+                                      <li>Зайдите на <a href="https://polza.ai" target="_blank" rel="noreferrer" className="text-[#5865f2] hover:underline">polza.ai</a></li>
+                                      <li>Войдите в аккаунт</li>
+                                      <li>Скопируйте ключ (начинается с pza_...)</li>
+                                  </>
+                              )}
                           </ol>
                       </div>
 
                       <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-black/20 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
                           <h3 className="font-bold mb-2 flex items-center gap-2">2. Выберите модель</h3>
                           <ol className="list-decimal list-inside space-y-1 opacity-80">
-                              <li>Перейдите на <a href="https://openrouter.ai/models" target="_blank" rel="noreferrer" className="text-[#5865f2] hover:underline">openrouter.ai/models</a></li>
-                              <li>Выберите любую модель (например, google/gemini-2.0-flash-001)</li>
-                              <li>Скопируйте её ID (он написан серым цветом под названием)</li>
+                              {addModelProvider === 'openrouter' ? (
+                                  <>
+                                      <li>Перейдите на <a href="https://openrouter.ai/models" target="_blank" rel="noreferrer" className="text-[#5865f2] hover:underline">openrouter.ai/models</a></li>
+                                      <li>Выберите любую модель (например, google/gemini-2.0-flash-001)</li>
+                                      <li>Скопируйте её ID (он написан серым цветом под названием)</li>
+                                  </>
+                              ) : (
+                                  <>
+                                      <li>Выберите любую модель из списка на сайте</li>
+                                      <li>Скопируйте её ID (например, anthropic/claude-3-5-sonnet)</li>
+                                  </>
+                              )}
                           </ol>
                       </div>
                       
                       <p className="opacity-60 text-xs">
-                          Примечание: Многие модели на OpenRouter бесплатны (Free), но для мощных моделей (GPT-4, Claude 3 Opus) нужно пополнить баланс (от $5).
+                          Примечание: Многие модели на {addModelProvider === 'openrouter' ? 'OpenRouter бесплатны (Free)' : 'Polza.ai'}, но для мощных моделей (GPT-4, Claude 3.5 Sonnet) нужно пополнить баланс.
                       </p>
                   </div>
               </div>
@@ -430,7 +466,7 @@ const AIPage: React.FC<AIPageProps> = ({
                   <div className="flex flex-col items-start">
                       <span className="hidden sm:block text-[10px] font-bold uppercase opacity-50 leading-none mb-0.5">Модель</span>
                       <div className="flex items-center gap-1">
-                          <span className={`text-sm font-bold truncate max-w-[100px] sm:max-w-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{currentModel?.name || 'Unknown'}</span>
+                          <span className={`text-sm font-bold truncate max-w-[100px] sm:max-w-none ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{currentModel?.name || 'Нет моделей'}</span>
                           <ChevronDown size={12} className="opacity-50" />
                       </div>
                   </div>
@@ -446,16 +482,21 @@ const AIPage: React.FC<AIPageProps> = ({
                                   onClick={() => { setSelectedModel(model.id); setShowModelSelector(false); }}
                                   className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between group transition-colors ${selectedModel === model.id ? (isDarkMode ? 'bg-[#5865f2]/20 text-[#5865f2]' : 'bg-indigo-50 text-indigo-600') : (isDarkMode ? 'hover:bg-white/5 text-gray-300' : 'hover:bg-gray-50 text-gray-700')}`}
                                >
-                                   <span className="truncate font-medium text-sm">{model.name}</span>
-                                   {selectedModel === model.id && <Check size={14} />}
-                                   {!model.isDefault && (
-                                       <div 
-                                          onClick={(e) => handleDeleteModel(e, model.id)}
-                                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
-                                       >
-                                           <Trash2 size={12} />
-                                       </div>
-                                   )}
+                                   <div className="flex flex-col items-start min-w-0">
+                                       <span className="truncate font-medium text-sm">{model.name}</span>
+                                       <span className="text-[10px] opacity-50 uppercase">{model.provider === 'openrouter' ? 'OpenRouter' : 'Polza.ai'}</span>
+                                   </div>
+                                   <div className="flex items-center gap-2 ml-auto">
+                                       {selectedModel === model.id && <Check size={14} />}
+                                       {!model.isDefault && (
+                                           <div 
+                                              onClick={(e) => handleDeleteModel(e, model.id)}
+                                              className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
+                                           >
+                                               <Trash2 size={12} />
+                                           </div>
+                                       )}
+                                   </div>
                                </button>
                            ))}
                        </div>
@@ -475,7 +516,7 @@ const AIPage: React.FC<AIPageProps> = ({
            {isLoading && (
                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#5865f2]/10 text-[#5865f2]">
                    <Loader2 size={12} className="animate-spin" />
-                   <span className="text-xs font-bold">{currentModel?.name.split(' ')[0]} думает...</span>
+                   <span className="text-xs font-bold">{currentModel?.name?.split(' ')[0] || 'ИИ'} думает...</span>
                </div>
            )}
          </div>
@@ -490,7 +531,21 @@ const AIPage: React.FC<AIPageProps> = ({
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto pr-2 custom-scrollbar scroll-smooth px-4 py-4">
-        {messages.length === 0 ? (
+        {aiModels.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center opacity-100 select-none text-center animate-in zoom-in-95 duration-500">
+             <div className="relative">
+                <div className={`w-32 h-32 rounded-[40px] flex items-center justify-center mb-8 shadow-2xl relative z-10 ${isDarkMode ? 'bg-gradient-to-br from-[#2f3136] to-[#202225] border border-white/5' : 'bg-white border border-gray-100'}`}>
+                    <BotIcon size={64} className="text-[#5865f2]" />
+                </div>
+                <div className="absolute top-0 left-0 w-32 h-32 bg-[#5865f2] blur-[80px] opacity-20 animate-pulse"></div>
+             </div>
+            <h3 className={`font-extrabold text-2xl mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Нет подключенных нейросетей</h3>
+            <div className={`max-w-xs space-y-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+               <p className="text-sm font-medium">Пожалуйста, добавьте свою модель через меню сверху, чтобы начать общение.</p>
+               <button onClick={() => setShowAddModel(true)} className="px-6 py-2 bg-[#5865f2] hover:bg-[#4752c4] text-white rounded-xl font-bold transition-colors shadow-lg shadow-[#5865f2]/20">Добавить модель</button>
+            </div>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-100 select-none text-center animate-in zoom-in-95 duration-500">
              <div className="relative">
                 <div className={`w-32 h-32 rounded-[40px] flex items-center justify-center mb-8 shadow-2xl relative z-10 ${isDarkMode ? 'bg-gradient-to-br from-[#2f3136] to-[#202225] border border-white/5' : 'bg-white border border-gray-100'}`}>
@@ -498,9 +553,13 @@ const AIPage: React.FC<AIPageProps> = ({
                 </div>
                 <div className="absolute top-0 left-0 w-32 h-32 bg-[#5865f2] blur-[80px] opacity-20 animate-pulse"></div>
              </div>
-            <h3 className={`font-extrabold text-2xl mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Qwen 2.5 VL</h3>
+            {/* 
+              ЗДЕСЬ МОЖНО ИЗМЕНИТЬ НАЗВАНИЕ И ОПИСАНИЕ НЕЙРОСЕТИ НА ГЛАВНОМ ЭКРАНЕ ЧАТА.
+              По умолчанию используется имя из currentModel.name, но вы можете написать любой текст.
+            */}
+            <h3 className={`font-extrabold text-2xl mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{currentModel?.name || 'Claude 3.5 Sonnet'}</h3>
             <div className={`max-w-xs space-y-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-               <p className="text-sm font-medium">Ваш умный помощник на базе Qwen. Решает задачи, пишет код и объясняет сложные темы с использованием цепочки рассуждений.</p>
+               <p className="text-sm font-medium">Ваш умный помощник на базе Qwen. Решает задачи, пишет код и объясняет сложные темы.</p>
             </div>
           </div>
         ) : (
@@ -534,11 +593,11 @@ const AIPage: React.FC<AIPageProps> = ({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={"Спроси меня о чем угодно..."}
+                placeholder={aiModels.length === 0 ? "Сначала добавьте модель..." : "Спроси меня о чем угодно..."}
                 className={`bg-transparent border-none flex-1 p-4 pl-5 outline-none font-medium text-base resize-none custom-scrollbar ${isDarkMode ? 'text-white placeholder-gray-500' : 'text-gray-900 placeholder-gray-400'}`}
                 rows={1}
                 style={{ minHeight: '56px', maxHeight: '150px' }}
-                disabled={isLoading}
+                disabled={isLoading || aiModels.length === 0}
                 />
                 
                 {isLoading ? (
@@ -552,8 +611,8 @@ const AIPage: React.FC<AIPageProps> = ({
                 ) : (
                     <button 
                     onClick={handleSendClick} 
-                    disabled={!input.trim()}
-                    className={`p-3 mr-1.5 mb-1.5 rounded-[20px] transition-all shadow-md active:scale-95 flex items-center justify-center w-12 h-12 shrink-0 ${!input.trim() ? 'bg-gray-500/10 text-gray-400 cursor-not-allowed opacity-50' : 'bg-[#5865f2] text-white hover:bg-[#4752c4] shadow-[#5865f2]/30'}`}
+                    disabled={!input.trim() || aiModels.length === 0}
+                    className={`p-3 mr-1.5 mb-1.5 rounded-[20px] transition-all shadow-md active:scale-95 flex items-center justify-center w-12 h-12 shrink-0 ${(!input.trim() || aiModels.length === 0) ? 'bg-gray-500/10 text-gray-400 cursor-not-allowed opacity-50' : 'bg-[#5865f2] text-white hover:bg-[#4752c4] shadow-[#5865f2]/30'}`}
                     >
                     <Send size={20} className={input.trim() ? "ml-0.5" : ""} />
                     </button>

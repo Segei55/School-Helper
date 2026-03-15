@@ -25,6 +25,8 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.API_KEY': JSON.stringify(env.API_KEY),
       'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY || ''),
+      'process.env.AI_API_KEY': JSON.stringify(env.AI_API_KEY || ''),
+      'process.env.POLZA_API_KEY': JSON.stringify(env.POLZA_API_KEY || ''),
     }
   }
 })

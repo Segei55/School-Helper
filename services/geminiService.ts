@@ -1,6 +1,6 @@
 
 /**
- * Сервис для работы с ИИ через OpenRouter
+ * Сервис для работы с ИИ через Polza.ai
  */
 
 interface ChatMessage {
@@ -9,7 +9,7 @@ interface ChatMessage {
 }
 
 /**
- * Стриминг ответа от OpenRouter
+ * Стриминг ответа от Polza.ai
  */
 export const streamMessageFromGemini = async (
   message: string, 
@@ -17,7 +17,8 @@ export const streamMessageFromGemini = async (
   modelName: string = "qwen/qwen3-vl-30b-a3b-thinking",
   systemInstruction: string = 'Ты — классный парень и школьный помощник. Общайся на русском языке, будь дружелюбным, используй эмодзи 📚✨. Объясняй сложные темы просто и понятно, как друг.',
   apiKey?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  provider: 'openrouter' | 'polza' = 'polza'
 ) => {
   
   // Мапим историю
@@ -63,7 +64,8 @@ export const streamMessageFromGemini = async (
           messages, 
           model: modelName,
           systemInstruction,
-          apiKey
+          apiKey,
+          provider
       });
 
       if (signal) {
@@ -100,22 +102,28 @@ export const streamMessageFromGemini = async (
       };
   }
 
-  // 2. WEB MODE (Direct OpenRouter Call)
-  const API_KEY = apiKey || process.env.OPENROUTER_API_KEY || '';
+  // 2. WEB MODE (Direct API Call)
+  const isPolza = provider === 'polza';
+  const API_KEY = apiKey || (isPolza ? process.env.POLZA_API_KEY : (process.env.AI_API_KEY || process.env.OPENROUTER_API_KEY)) || '';
   
   if (!API_KEY) {
-      throw new Error("API ключ не настроен. Пожалуйста, добавьте его в настройки или переменные окружения.");
+      throw new Error(`API ключ ${isPolza ? 'Polza.ai' : 'OpenRouter'} не настроен. Пожалуйста, добавьте его в настройки или переменные окружения.`);
+  }
+
+  const headers: any = {
+      "Authorization": `Bearer ${API_KEY}`,
+      "Content-Type": "application/json"
+  };
+
+  if (!isPolza) {
+      headers["HTTP-Referer"] = window.location.origin;
+      headers["X-Title"] = "School Helper";
   }
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch(isPolza ? "https://polza.ai/api/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
-        headers: {
-        "Authorization": `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": window.location.origin, // Required by OpenRouter
-        "X-Title": "School Helper" // Optional
-        },
+        headers,
         body: JSON.stringify({
         model: modelName,
         messages: [
@@ -127,9 +135,13 @@ export const streamMessageFromGemini = async (
         signal
     });
 
+    if (response.status === 429) {
+        throw new Error('Rate Limit Exceeded: Слишком много запросов. Пожалуйста, подождите.');
+    }
+
     if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`OpenRouter API Error: ${response.status} ${errText}`);
+        throw new Error(`${isPolza ? 'Polza.ai' : 'OpenRouter'} API Error: ${response.status} ${errText}`);
     }
 
     const reader = response.body?.getReader();

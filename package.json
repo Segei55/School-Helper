@@ -16,6 +16,7 @@
     "electron:start": "electron .",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build:win": "npm run build && electron-builder --win",
+    "build:win-portable": "npm run build && electron-builder --win portable",
     "build:linux": "npm run build && cross-env USE_SYSTEM_FPM=true ELECTRON_BUILDER_CACHE=~/.cache/electron-builder electron-builder --linux",
     "build:appimage": "npm run build && electron-builder --linux AppImage",
     "build:snap": "npm run build && electron-builder --linux snap",
@@ -30,6 +31,7 @@
     "canvas-confetti": "^1.9.4",
     "lucide-react": "^0.562.0",
     "motion": "^12.35.0",
+    "openai": "^6.29.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^9.0.1",
@@ -57,11 +59,12 @@
   "build": {
     "appId": "com.schoolhelper.app",
     "productName": "School Helper",
+    "copyright": "Copyright © 2026 Sihmer",
     "directories": {
       "output": "dist_electron",
       "buildResources": "electron"
     },
-    "icon": "icon.png",
+    "asar": true,
     "protocols": [
       {
         "name": "school-helper-auth",
@@ -77,18 +80,24 @@
     ],
     "win": {
       "target": [
-        "nsis",
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
         "portable"
       ],
-      "icon": "icon.png",
-      "publish": null
+      "icon": "electron/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "School Helper"
+      "shortcutName": "School Helper",
+      "installerIcon": "electron/icon.png",
+      "uninstallerIcon": "electron/icon.png"
     },
     "mac": {
       "target": "dmg",

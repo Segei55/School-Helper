@@ -161,9 +161,10 @@ export interface SyncBrowserData {
 export interface AIModel {
   id: string;
   name: string;
-  modelId: string; // OpenRouter model ID (e.g. "qwen/qwen-2.5-vl")
+  modelId: string; // Model ID (e.g. "anthropic/claude-3-5-sonnet")
   apiKey?: string; // Optional custom key
   isDefault?: boolean;
+  provider?: 'openrouter' | 'polza';
 }
 
 // --- Drawing Types ---
@@ -244,6 +245,7 @@ declare global {
       
       // AI Secure Bridge
       streamAiRequest: (data: any) => void;
+      polzaChat: (messages: any[], model?: string) => Promise<any>;
       onAiChunk: (callback: (chunk: string) => void) => void;
       onAiDone: (callback: () => void) => void;
       onAiError: (callback: (err: string) => void) => void;

@@ -4,6 +4,7 @@ const https = require('https');
 const querystring = require('querystring');
 const fs = require('fs');
 const url = require('url');
+const OpenAI = require('openai');
 
 // --- LOCAL DEV CONFIG ---
 try {
@@ -29,7 +30,8 @@ try {
 const API_KEY_FALLBACK = ""; 
 
 // SECURITY: KEY FOR AI
-let OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "REPLACE_ME_IN_CI";
+let OPENROUTER_API_KEY = process.env.AI_API_KEY || process.env.OPENROUTER_API_KEY || "REPLACE_ME_IN_CI";
+let POLZA_API_KEY = process.env.POLZA_API_KEY || "REPLACE_ME_IN_CI_POLZA";
 
 let mainWindow;
 let authWindow = null;
@@ -443,10 +445,12 @@ ipcMain.handle('google-login', async (event) => {
 });
 
 // --- AI PROXY (SECURE REQUESTS) ---
-ipcMain.on('ai-request', async (event, { messages, model, systemInstruction, apiKey }) => {
-    const finalApiKey = apiKey || OPENROUTER_API_KEY;
+ipcMain.on('ai-request', async (event, { messages, model, systemInstruction, apiKey, provider }) => {
+    const isPolza = provider === 'polza';
+    const finalApiKey = apiKey || (isPolza ? POLZA_API_KEY : OPENROUTER_API_KEY);
+    
     if (!finalApiKey || finalApiKey.includes('REPLACE_ME')) {
-        event.sender.send('ai-error', 'API ключ не настроен.');
+        event.sender.send('ai-error', `API ключ ${isPolza ? 'Polza.ai' : 'OpenRouter'} не настроен.`);
         return;
     }
 
@@ -464,16 +468,22 @@ ipcMain.on('ai-request', async (event, { messages, model, systemInstruction, api
     const request = net.request({
         method: 'POST',
         protocol: 'https:',
-        hostname: 'openrouter.ai',
+        hostname: isPolza ? 'polza.ai' : 'openrouter.ai',
         path: '/api/v1/chat/completions',
     });
 
     request.setHeader('Authorization', `Bearer ${finalApiKey}`);
     request.setHeader('Content-Type', 'application/json');
-    request.setHeader('HTTP-Referer', 'https://school-helper.ru');
-    request.setHeader('X-Title', 'School Helper Desktop');
+    if (!isPolza) {
+        request.setHeader('HTTP-Referer', 'https://school-helper.ru');
+        request.setHeader('X-Title', 'School Helper Desktop');
+    }
 
     request.on('response', (response) => {
+        if (response.statusCode === 429) {
+            event.sender.send('ai-error', 'Rate Limit Exceeded: Слишком много запросов. Пожалуйста, подождите.');
+            return;
+        }
         if (response.statusCode !== 200) {
             event.sender.send('ai-error', `Ошибка сервера: ${response.statusCode}`);
             return;
@@ -501,6 +511,32 @@ ipcMain.on('ai-request', async (event, { messages, model, systemInstruction, api
     request.on('error', (error) => event.sender.send('ai-error', error.message));
     request.write(payload);
     request.end();
+});
+
+// --- POLZA.AI PROXY (SECURE REQUESTS) ---
+ipcMain.handle('polza-chat', async (event, messages, model = 'anthropic/claude-3-5-sonnet') => {
+    const finalApiKey = process.env.AI_API_KEY || POLZA_API_KEY;
+    if (!finalApiKey || finalApiKey.includes('REPLACE_ME')) {
+        throw new Error('API ключ Polza.ai не настроен.');
+    }
+
+    const openai = new OpenAI({
+        apiKey: finalApiKey,
+        baseURL: 'https://polza.ai/api/v1',
+    });
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: model,
+            messages: messages,
+        });
+        return response.choices[0].message;
+    } catch (error) {
+        if (error.status === 429) {
+            throw new Error('Rate Limit Exceeded: Слишком много запросов. Пожалуйста, подождите.');
+        }
+        throw error;
+    }
 });
 
 

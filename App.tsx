@@ -271,13 +271,23 @@ const App: React.FC = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   
   const [aiModels, setAiModels] = useState<AIModel[]>(() => {
+      const defaultModel: AIModel = { 
+          id: 'default', 
+          name: 'Qwen 3 4B (Free)', 
+          modelId: 'qwen/qwen3-4b:free',
+          isDefault: true, 
+          provider: 'openrouter' 
+      };
+
       try {
           const saved = localStorage.getItem('school_helper_ai_models');
-          if (saved) return JSON.parse(saved);
+          if (saved) {
+              const parsed = JSON.parse(saved);
+              const filtered = parsed.filter((m: AIModel) => !m.isDefault);
+              return [defaultModel, ...filtered];
+          }
       } catch {}
-      return [
-          { id: 'default', name: 'Qwen 2.5 VL', modelId: 'qwen/qwen3-vl-30b-a3b-thinking', isDefault: true }
-      ];
+      return [defaultModel];
   });
   
   const [aiSelectedModelId, setAiSelectedModelId] = useState<string>(() => {
@@ -793,13 +803,21 @@ const App: React.FC = () => {
       
       const selectedModelConfig = aiModels.find(m => m.id === aiSelectedModelId) || aiModels[0];
       
+      if (!selectedModelConfig) {
+          setAiMessages(prev => [...prev, { role: 'model', text: 'Пожалуйста, добавьте модель нейросети для начала общения.', isError: true }]);
+          setIsAiLoading(false);
+          isAiStreamingRef.current = false;
+          return;
+      }
+
       const stream = await streamMessageFromGemini(
           text, 
           history, 
           selectedModelConfig.modelId, 
           undefined, 
           selectedModelConfig.apiKey, 
-          abortControllerRef.current.signal
+          abortControllerRef.current.signal,
+          selectedModelConfig.provider || 'polza'
       );
       let fullText = "";
 
