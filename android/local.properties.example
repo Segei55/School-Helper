@@ -1,0 +1,3 @@
+# Переименуйте этот файл в local.properties и добавьте ваши секретные ключи
+# Файл local.properties добавлен в .gitignore и не попадет в публичный репозиторий
+API_KEY=your_secret_api_key_here
