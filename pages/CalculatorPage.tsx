@@ -28,12 +28,17 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
   const [isDragging, setIsDragging] = useState(false);
   const [isSnapActive, setIsSnapActive] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [mouseMathPos, setMouseMathPos] = useState({ x: 0, y: 0 });
   const [showCoords, setShowCoords] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   
+  const mousePosRef = useRef({ x: 0, y: 0 });
+  const mouseMathPosRef = useRef({ x: 0, y: 0 });
+  const coordXRef = useRef<HTMLSpanElement>(null);
+  const coordYRef = useRef<HTMLSpanElement>(null);
+  const coordFullXRef = useRef<HTMLSpanElement>(null);
+  const coordFullYRef = useRef<HTMLSpanElement>(null);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fullCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -273,7 +278,7 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
       ctx.beginPath();
 
       let started = false;
-      const precision = 2; 
+      const precision = 1; // Optimized for low-end devices (was 2)
       // Security: This uses new Function, but on inputs controlled by the specific replacements above.
       // For production, a proper math parser library (like mathjs) is recommended instead of eval/Function, 
       // but for this snippet, we ensure basic hygiene.
@@ -294,13 +299,13 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
       ctx.stroke();
 
       if (showCoords && !isDragging) {
-        let drawX = mousePos.x;
-        let drawY = mousePos.y;
-        const mathX = (mousePos.x - centerX) / zoom;
+        let drawX = mousePosRef.current.x;
+        let drawY = mousePosRef.current.y;
+        const mathX = (mousePosRef.current.x - centerX) / zoom;
 
         if (isSnapActive) {
           const snappedMathX = Math.round(mathX);
-          const snappedMathY = Math.round((centerY - mousePos.y) / zoom);
+          const snappedMathY = Math.round((centerY - mousePosRef.current.y) / zoom);
           drawX = centerX + snappedMathX * zoom;
           drawY = centerY - snappedMathY * zoom;
         } else {
@@ -328,19 +333,18 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
         ctx.shadowBlur = 0;
       }
     } catch (e) {}
-  }, [viewOffset, zoom, functionText, isDarkMode, showCoords, mousePos, isDragging, isSnapActive]);
+  }, [viewOffset, zoom, functionText, isDarkMode, showCoords, isDragging, isSnapActive]);
 
   useEffect(() => {
-    const render = () => {
-      // Only draw if we are in graphing mode (and premium is active, or we draw anyway but it's covered)
-      if (activeTab === 'graphing') {
-          drawGraph(canvasRef.current, false);
-          if (isFullscreen) drawGraph(fullCanvasRef.current, true);
-      }
-    };
-    render();
-    const raf = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(raf);
+    // Only draw if we are in graphing mode
+    if (activeTab === 'graphing') {
+      // Use requestAnimationFrame once per state change to ensure smooth rendering without blocking the main thread,
+      // but avoid the continuous 60fps infinite loop which lags low-end devices.
+      requestAnimationFrame(() => {
+        drawGraph(canvasRef.current, false);
+        if (isFullscreen) drawGraph(fullCanvasRef.current, true);
+      });
+    }
   }, [drawGraph, isFullscreen, activeTab]);
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -377,15 +381,27 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
       } catch(e) {}
     }
     
-    setMousePos({ x, y });
-    setMouseMathPos({ x: mathX, y: mathY });
-    setShowCoords(true);
+    mousePosRef.current = { x, y };
+    mouseMathPosRef.current = { x: mathX, y: mathY };
+    
+    if (coordXRef.current) coordXRef.current.innerText = mathX.toFixed(isSnapActive ? 0 : 2);
+    if (coordYRef.current) coordYRef.current.innerText = mathY.toFixed(isSnapActive ? 0 : 2);
+    if (coordFullXRef.current) coordFullXRef.current.innerText = mathX.toFixed(isSnapActive ? 0 : 2);
+    if (coordFullYRef.current) coordFullYRef.current.innerText = mathY.toFixed(isSnapActive ? 0 : 2);
+
+    if (!showCoords) setShowCoords(true);
 
     if (isDragging) {
       const dx = e.clientX - lastMousePos.x;
       const dy = e.clientY - lastMousePos.y;
       setViewOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
       setLastMousePos({ x: e.clientX, y: e.clientY });
+    } else {
+      // Redraw graph to update crosshair without full re-render
+      requestAnimationFrame(() => {
+        drawGraph(canvasRef.current, false);
+        if (isFullscreen) drawGraph(fullCanvasRef.current, true);
+      });
     }
   };
 
@@ -400,10 +416,10 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
   const displayBg = isDarkMode ? 'bg-[#202225]' : 'bg-gray-100';
   const textColor = isDarkMode ? 'text-white' : 'text-gray-900';
 
-  const CoordinateOverlay = () => (
+  const CoordinateOverlay = ({ isFull = false }: { isFull?: boolean }) => (
     <div className={`absolute top-3 left-3 backdrop-blur-md border p-2 rounded-xl text-[10px] md:text-xs font-mono shadow-xl z-50 pointer-events-none ${isDarkMode ? 'bg-[#202225]/80 border-white/10 text-white' : 'bg-white/80 border-gray-200 text-gray-800'}`}>
-      <div className="flex justify-between gap-3"><span className="opacity-40 uppercase font-bold text-[8px] md:text-[10px]">X:</span><span className="text-[#faa61a]">{mouseMathPos.x.toFixed(isSnapActive ? 0 : 2)}</span></div>
-      <div className="flex justify-between gap-3"><span className="opacity-40 uppercase font-bold text-[8px] md:text-[10px]">Y:</span><span className="text-[#faa61a]">{mouseMathPos.y.toFixed(isSnapActive ? 0 : 2)}</span></div>
+      <div className="flex justify-between gap-3"><span className="opacity-40 uppercase font-bold text-[8px] md:text-[10px]">X:</span><span ref={isFull ? coordFullXRef : coordXRef} className="text-[#faa61a]">{mouseMathPosRef.current.x.toFixed(isSnapActive ? 0 : 2)}</span></div>
+      <div className="flex justify-between gap-3"><span className="opacity-40 uppercase font-bold text-[8px] md:text-[10px]">Y:</span><span ref={isFull ? coordFullYRef : coordYRef} className="text-[#faa61a]">{mouseMathPosRef.current.y.toFixed(isSnapActive ? 0 : 2)}</span></div>
     </div>
   );
 
@@ -608,7 +624,7 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
            <div className={`flex-1 rounded-[32px] md:rounded-[40px] overflow-hidden relative border shadow-2xl ${isDarkMode ? 'border-white/10 bg-black/40' : 'border-gray-200 bg-gray-50'}`} onMouseLeave={() => setShowCoords(false)}>
               <canvas ref={fullCanvasRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onWheel={handleWheel} className="w-full h-full block" />
               
-              {showCoords && !isDragging && <CoordinateOverlay />}
+              {showCoords && !isDragging && <CoordinateOverlay isFull={true} />}
 
               <div className="absolute top-4 right-4 flex flex-col gap-2">
                  <button onClick={() => setShowHelp(!showHelp)} className={`p-3 backdrop-blur-md rounded-2xl shadow-lg border transition-all ${showHelp ? 'bg-[#faa61a] text-white border-transparent' : (isDarkMode ? 'bg-black/40 text-white border-transparent' : 'bg-white text-gray-600 border-gray-200')}`} title="Подсказка">
@@ -618,6 +634,21 @@ const CalculatorPage: React.FC<CalculatorPageProps> = ({ isDarkMode = true, isPr
                    <Magnet size={20} />
                  </button>
               </div>
+
+              {showHelp && (
+                <div className={`absolute top-16 left-6 right-6 md:left-auto md:right-20 md:w-80 backdrop-blur-md border p-5 rounded-2xl shadow-2xl animate-in slide-in-from-top-4 z-20 ${isDarkMode ? 'bg-[#2f3136]/95 border-white/10 text-gray-200' : 'bg-white/95 border-gray-200 text-gray-700'}`}>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="font-bold text-xs md:text-sm uppercase flex items-center gap-2"><Info size={16} className="text-[#5865f2]" /> Управление графиком</span>
+                    <button onClick={() => setShowHelp(false)} className="p-1 hover:bg-black/10 rounded-lg transition-colors"><X size={18} /></button>
+                  </div>
+                  <ul className="text-xs md:text-sm space-y-2 opacity-80 font-medium">
+                    <li className="flex items-center gap-2"><span>•</span> <span>Прокрутка (Scroll) — Зум</span></li>
+                    <li className="flex items-center gap-2"><span>•</span> <span>Перетаскивание (Drag) — Перемещение</span></li>
+                    <li className="flex items-center gap-2"><span>•</span> <span>Магнит — Привязка к сетке</span></li>
+                    <li className="flex items-center gap-2"><span>•</span> <span>f(x) — Введите функцию</span></li>
+                  </ul>
+                </div>
+              )}
            </div>
         </div>
       )}

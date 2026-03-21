@@ -35,7 +35,7 @@ jobs:
 
       - name: Inject Secrets into Main Process (Linux)
         run: |
-          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); content = content.replace('REPLACE_ME_IN_CI', process.env.OPENROUTER_API_KEY || 'REPLACE_ME_IN_CI').replace('REPLACE_ME_IN_CI_POLZA', process.env.AI_API_KEY || 'REPLACE_ME_IN_CI_POLZA'); fs.writeFileSync(path, content);"
+          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); const b64 = (str) => Buffer.from(str || '').toString('base64'); content = content.replace('REPLACE_ME_IN_CI', b64(process.env.OPENROUTER_API_KEY)).replace('REPLACE_ME_IN_CI_POLZA', b64(process.env.AI_API_KEY)); fs.writeFileSync(path, content);"
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
@@ -47,7 +47,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Build Electron App (Linux)
-        run: npx electron-builder --linux AppImage deb tar.gz
+        run: npx electron-builder --linux
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           USE_SYSTEM_FPM: true
@@ -77,7 +77,7 @@ jobs:
 
       - name: Inject Secrets into Main Process (Windows)
         run: |
-          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); content = content.replace('REPLACE_ME_IN_CI', process.env.OPENROUTER_API_KEY || 'REPLACE_ME_IN_CI').replace('REPLACE_ME_IN_CI_POLZA', process.env.AI_API_KEY || 'REPLACE_ME_IN_CI_POLZA'); fs.writeFileSync(path, content);"
+          node -e "const fs = require('fs'); const path = 'electron/main.js'; let content = fs.readFileSync(path, 'utf8'); const b64 = (str) => Buffer.from(str || '').toString('base64'); content = content.replace('REPLACE_ME_IN_CI', b64(process.env.OPENROUTER_API_KEY)).replace('REPLACE_ME_IN_CI_POLZA', b64(process.env.AI_API_KEY)); fs.writeFileSync(path, content);"
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
@@ -89,7 +89,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Build Electron App (exe)
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

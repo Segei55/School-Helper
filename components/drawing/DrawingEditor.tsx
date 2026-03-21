@@ -177,30 +177,7 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   }, [history, historyIndex, restoreCanvasState]);
 
   // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if any input is focused to avoid triggering when typing
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          handleRedo();
-        } else {
-          handleUndo();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo]);
-  
+  // --- Background ---
   const handleBackgroundColorChange = (newColor: string) => {
     setBackgroundColor(newColor);
     
@@ -211,8 +188,10 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
     }, 500);
   };
 
-  const [cursorPos, setCursorPos] = useState<{x: number, y: number} | null>(null);
   const [eyedropperColor, setEyedropperColor] = useState<string>('#ffffff');
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const eyedropperRef = useRef<HTMLDivElement>(null);
+  const fillRef = useRef<HTMLDivElement>(null);
   const helperCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // --- Helper: Get Composite Color ---
@@ -339,12 +318,6 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    // Update cursor position
-    if (!('touches' in e)) {
-       const { x, y } = getCoordinates(e);
-       setCursorPos({ x, y });
-    }
-
     if (!isDrawing.current || !lastPos.current) return;
     
     const { x, y } = getCoordinates(e);
@@ -436,7 +409,19 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
     // Update cursor position if not panning
     if (!isPanning.current) {
         const { x, y } = getCoordinates(e);
-        setCursorPos({ x, y });
+        
+        if (cursorRef.current) {
+            cursorRef.current.style.left = `${x}px`;
+            cursorRef.current.style.top = `${y}px`;
+        }
+        if (eyedropperRef.current) {
+            eyedropperRef.current.style.left = `${x}px`;
+            eyedropperRef.current.style.top = `${y}px`;
+        }
+        if (fillRef.current) {
+            fillRef.current.style.left = `${x}px`;
+            fillRef.current.style.top = `${y}px`;
+        }
         
         if (tool === 'eyedropper') {
             const color = getCompositeColor(x, y);
@@ -454,7 +439,11 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
 
   const handleMouseEnter = (e: React.MouseEvent) => {
      const { x, y } = getCoordinates(e);
-     setCursorPos({ x, y });
+     
+     if (cursorRef.current) cursorRef.current.style.display = 'block';
+     if (eyedropperRef.current) eyedropperRef.current.style.display = 'flex';
+     if (fillRef.current) fillRef.current.style.display = 'block';
+
      if (tool === 'eyedropper') {
         const color = getCompositeColor(x, y);
         setEyedropperColor(color);
@@ -462,7 +451,10 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   };
 
   const handleMouseLeave = () => {
-     setCursorPos(null);
+     if (cursorRef.current) cursorRef.current.style.display = 'none';
+     if (eyedropperRef.current) eyedropperRef.current.style.display = 'none';
+     if (fillRef.current) fillRef.current.style.display = 'none';
+     
      // Do not stop panning here, window listener handles it
      stopDrawing();
   };
@@ -561,6 +553,12 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
       }
     });
 
+    // Grid
+    if (gridCanvasRef.current) {
+      ctx.globalAlpha = 1;
+      ctx.drawImage(gridCanvasRef.current, 0, 0);
+    }
+
     const thumbnail = tempCanvas.toDataURL('image/png', 0.5);
     
     const updatedProject: DrawingProject = {
@@ -586,6 +584,34 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
   useEffect(() => {
     handleSaveRef.current = handleSave;
   }, [handleSave]);
+
+  // --- Keyboard Support ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if any input is focused to avoid triggering when typing
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyS' || e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'ы')) {
+        e.preventDefault();
+        handleSave();
+      } else if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyZ' || e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'я')) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyY' || e.key.toLowerCase() === 'y' || e.key.toLowerCase() === 'н')) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo, handleSave]);
 
   // Autosave effect
   useEffect(() => {
@@ -656,6 +682,12 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
         }
       }
     });
+
+    // Grid
+    if (gridCanvasRef.current) {
+      ctx.globalAlpha = 1;
+      ctx.drawImage(gridCanvasRef.current, 0, 0);
+    }
 
     const link = document.createElement('a');
     link.download = `${exportName}.${exportFormat}`;
@@ -772,33 +804,42 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
           />
 
           {/* Brush Cursor Overlay */}
-          {cursorPos && (tool === 'brush' || tool === 'eraser') && !isPanning.current && (
+          {(tool === 'brush' || tool === 'eraser') && !isPanning.current && (
             <div 
-              className="absolute pointer-events-none rounded-full border border-black/50 bg-white/20 z-50"
+              ref={cursorRef}
+              className="absolute pointer-events-none rounded-full z-50 hidden flex items-center justify-center"
               style={{
-                left: cursorPos.x,
-                top: cursorPos.y,
                 width: brushSize,
                 height: brushSize,
                 transform: 'translate(-50%, -50%)',
-                borderColor: tool === 'brush' ? (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)') : 'rgba(0,0,0,0.5)',
-                backgroundColor: tool === 'brush' ? brushColor + '40' : 'rgba(255,255,255,0.3)'
+                boxShadow: '0 0 0 1px white, 0 0 0 2px rgba(0,0,0,0.5)',
+                backgroundColor: tool === 'brush' ? brushColor + '20' : 'rgba(255,255,255,0.1)'
               }}
-            />
+            >
+               {/* Precision dot that is always visible */}
+               <div className="w-[2px] h-[2px] bg-white rounded-full shadow-[0_0_2px_black]" />
+               
+               {/* Crosshair lines for small brushes to make them more visible */}
+               {brushSize < 12 && (
+                 <>
+                   <div className="absolute w-4 h-[1px] bg-white/50" />
+                   <div className="absolute h-4 w-[1px] bg-white/50" />
+                 </>
+               )}
+            </div>
           )}
 
           {/* Eyedropper Cursor Overlay */}
-          {cursorPos && tool === 'eyedropper' && !isPanning.current && (
+          {tool === 'eyedropper' && !isPanning.current && (
             <div 
-              className="absolute pointer-events-none z-50 rounded-full shadow-xl flex items-center justify-center"
+              ref={eyedropperRef}
+              className="absolute pointer-events-none z-50 rounded-full shadow-xl items-center justify-center hidden"
               style={{
-                left: cursorPos.x,
-                top: cursorPos.y,
                 width: 60,
                 height: 60,
                 transform: 'translate(-50%, -50%)',
                 border: '4px solid white',
-                outline: '1px solid rgba(0,0,0,0.2)',
+                outline: '1px solid black',
                 backgroundColor: eyedropperColor,
               }}
             >
@@ -807,23 +848,16 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
             </div>
           )}
           {/* Fill Cursor Overlay */}
-          {cursorPos && tool === 'fill' && !isPanning.current && (
-            <>
+          {tool === 'fill' && !isPanning.current && (
+            <div ref={fillRef} className="absolute pointer-events-none z-50 hidden" style={{ transform: 'translate(-50%, -50%)' }}>
               {/* Precision Dot */}
               <div 
-                className="absolute pointer-events-none z-50 w-1 h-1 bg-black/50 outline outline-1 outline-white/50 rounded-full"
-                style={{
-                    left: cursorPos.x,
-                    top: cursorPos.y,
-                    transform: 'translate(-50%, -50%)'
-                }}
+                className="absolute pointer-events-none z-50 w-1 h-1 bg-white shadow-[0_0_2px_black] rounded-full"
               />
               {/* Bucket Icon */}
               <div 
                 className="absolute pointer-events-none z-50"
                 style={{
-                    left: cursorPos.x,
-                    top: cursorPos.y,
                     transform: 'translate(4px, -22px)'
                 }}
               >
@@ -862,7 +896,7 @@ const DrawingEditor: React.FC<DrawingEditorProps> = ({
                    />
                  </svg>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

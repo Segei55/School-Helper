@@ -30,8 +30,17 @@ try {
 const API_KEY_FALLBACK = ""; 
 
 // SECURITY: KEY FOR AI
-let OPENROUTER_API_KEY = process.env.AI_API_KEY || process.env.OPENROUTER_API_KEY || "REPLACE_ME_IN_CI";
-let POLZA_API_KEY = process.env.POLZA_API_KEY || "REPLACE_ME_IN_CI_POLZA";
+const decodeKey = (encoded) => {
+    try {
+        if (!encoded || encoded === 'REPLACE_ME_IN_CI' || encoded === 'REPLACE_ME_IN_CI_POLZA') return '';
+        return Buffer.from(encoded, 'base64').toString('utf8');
+    } catch (e) {
+        return '';
+    }
+};
+
+let OPENROUTER_API_KEY = process.env.AI_API_KEY || process.env.OPENROUTER_API_KEY || decodeKey("REPLACE_ME_IN_CI");
+let POLZA_API_KEY = process.env.POLZA_API_KEY || decodeKey("REPLACE_ME_IN_CI_POLZA");
 
 let mainWindow;
 let authWindow = null;
@@ -232,6 +241,39 @@ function createTray() {
         }
     }
   });
+}
+
+function setupApplicationMenu() {
+  const template = [
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 function createWindow() {
@@ -693,10 +735,6 @@ app.on('web-contents-created', (event, contents) => {
                            url.includes('signup');
 
             if (isAuth) {
-                if (!appSettings.useInternalBrowser) {
-                    shell.openExternal(url);
-                    return { action: 'deny' };
-                }
                 return { 
                     action: 'allow', 
                     overrideBrowserWindowOptions: { 
@@ -707,16 +745,12 @@ app.on('web-contents-created', (event, contents) => {
             }
 
             if (mainWindow) {
-                if (!appSettings.useInternalBrowser) {
-                    shell.openExternal(url);
-                } else {
-                    mainWindow.webContents.send('open-internal-url', url);
-                }
+                mainWindow.webContents.send('open-internal-url', url);
             }
             return { action: 'deny' };
         });
     }
 });
 
-app.whenReady().then(() => { loadTokens(); loadSettings(); createTray(); createWindow(); });
+app.whenReady().then(() => { loadTokens(); loadSettings(); createTray(); setupApplicationMenu(); createWindow(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

@@ -170,7 +170,9 @@ const TeacherNoiseMeterPage: React.FC<TeacherNoiseMeterPageProps> = ({ isDarkMod
     setDebugInfo('Остановлено');
   };
 
-  const updateVolume = () => {
+  const lastUpdateTimeRef = useRef(0);
+
+  const updateVolume = (timestamp?: number) => {
     if (!analyserRef.current || !audioContextRef.current) return;
     
     // Ensure context is running
@@ -197,7 +199,11 @@ const TeacherNoiseMeterPage: React.FC<TeacherNoiseMeterPageProps> = ({ isDarkMod
     normalizedVolume = normalizedVolume * sensitivityFactor;
     normalizedVolume = Math.min(100, Math.max(0, normalizedVolume));
     
-    setVolume(normalizedVolume);
+    const now = timestamp || performance.now();
+    if (now - lastUpdateTimeRef.current > 50) { // ~20fps
+      setVolume(normalizedVolume);
+      lastUpdateTimeRef.current = now;
+    }
     
     // Use ref for threshold to avoid stale closure
     const currentThreshold = thresholdRef.current;

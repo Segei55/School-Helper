@@ -180,6 +180,11 @@ const ConverterPage: React.FC<ConverterPageProps> = ({ isDarkMode = true }) => {
   }, []);
 
   const handleInputChange = useCallback((id: string, value: string) => {
+    if (value) {
+      const val = parseFloat(value);
+      if (val > 999999999) value = "999999999";
+      else if (val < -999999999) value = "-999999999";
+    }
     setInputs(prev => ({ ...prev, [id]: value }));
   }, []);
 

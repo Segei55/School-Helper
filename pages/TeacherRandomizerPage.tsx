@@ -24,7 +24,7 @@ const TeacherRandomizerPage: React.FC<TeacherRandomizerPageProps> = ({ isDarkMod
   const [winner, setWinner] = useState<string | null>(null);
   const [winnerColor, setWinnerColor] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [rotation, setRotation] = useState(0);
+  const rotationRef = useRef(0);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,7 +87,7 @@ const TeacherRandomizerPage: React.FC<TeacherRandomizerPageProps> = ({ isDarkMod
     // Save context for rotation
     ctx.save();
     ctx.translate(centerX, centerY);
-    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.rotate((rotationRef.current * Math.PI) / 180);
     ctx.translate(-centerX, -centerY);
 
     const totalSegments = items.length;
@@ -136,10 +136,10 @@ const TeacherRandomizerPage: React.FC<TeacherRandomizerPageProps> = ({ isDarkMod
     ctx.fill();
   };
 
-  // Redraw when rotation or items change
+  // Redraw when items change
   useEffect(() => {
     drawWheel();
-  }, [rotation, items, colors]);
+  }, [items, colors]);
 
   const spin = () => {
     if (isSpinning || items.length < 2) return;
@@ -159,7 +159,8 @@ const TeacherRandomizerPage: React.FC<TeacherRandomizerPageProps> = ({ isDarkMod
     const segmentSize = 360 / items.length;
     const randomOffset = Math.random() * segmentSize;
     
-    const targetRotation = rotation + totalRotation + randomOffset;
+    const startRotation = rotationRef.current;
+    const targetRotation = startRotation + totalRotation + randomOffset;
     
     const startTime = performance.now();
     const duration = spinDuration * 1000;
@@ -171,8 +172,9 @@ const TeacherRandomizerPage: React.FC<TeacherRandomizerPageProps> = ({ isDarkMod
       // Ease out cubic
       const easeOut = 1 - Math.pow(1 - progress, 3);
       
-      const currentRot = rotation + (targetRotation - rotation) * easeOut;
-      setRotation(currentRot);
+      const currentRot = startRotation + (targetRotation - startRotation) * easeOut;
+      rotationRef.current = currentRot;
+      drawWheel();
 
       if (progress < 1) {
         requestAnimationFrame(animate);

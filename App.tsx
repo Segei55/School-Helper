@@ -163,12 +163,24 @@ const App: React.FC = () => {
   // --- DEBUG LOGS STATE ---
   const [showLogs, setShowLogs] = useState(false);
 
-  // --- KEYBOARD LISTENERS (F9 for Logs) ---
+  // --- KEYBOARD LISTENERS (F9 for Logs, F11 for Fullscreen) ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'F9') {
             e.preventDefault();
             setShowLogs(prev => !prev);
+        }
+        if (e.key === 'F11') {
+            e.preventDefault();
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
         }
     };
     window.addEventListener('keydown', handleKeyDown);
